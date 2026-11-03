@@ -13,6 +13,8 @@ The menu keeps the existing Rename, New worktree / Open worktree / Remove worktr
 
 Pinning writes the space id to `shared("spaces.pinned")` and adds a **Pinned space** tab backed by the `space-pin` mod. That tab is a placeholder, not a terminal: if every terminal and agent in the space closes, the placeholder tab is still there, so the space remains. The sidebar row shows a pin icon while it is pinned.
 
+While the space has other tabs, the active `tabs-ref` tab bar hides that placeholder; it appears only when it is the only tab left. That keeps the space alive without an extra tab in the way. If you use a different tab bar, the placeholder stays visible.
+
 Unpinning closes the placeholder tab. If it was the only tab left, the space closes (normal behavior). The explicit **Close** item still closes the space; the pin protects against an empty space, not against choosing Close.
 
 ## Open in VS Code

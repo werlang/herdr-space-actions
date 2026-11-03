@@ -38,7 +38,7 @@ The menu is keyboard-navigable: ↑/↓ move, Enter runs, Esc closes.
 
 ## Watch out
 
-- The pinned placeholder is a real tab named **Pinned space**. It is visible in the tab bar; that is what keeps the space alive.
+- The pinned placeholder is a real tab named **Pinned space**. The active `tabs-ref` tab bar hides it while the space has other tabs; it appears only when it is the only tab left. That is what keeps the space alive without an extra visible tab.
 - If the user closes the placeholder tab itself and no other tabs remain, the space closes. Re-pin it or keep at least one tab.
 - Remote pinning depends on the remote core accepting a mod tab; the VS Code remote action assumes the Herdr machine target is a valid VS Code Remote SSH host.
 - The `code` CLI must be in `PATH`; without it the action reports a notification instead of opening VS Code.

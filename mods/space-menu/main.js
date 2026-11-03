@@ -83,7 +83,7 @@ async function openVSCode(space) {
 
 function iconFor(item) {
   if (item.icon === "pin") return "mods/space-menu/pin.svg";
-  if (item.icon === "code") return "icons/code.svg";
+  if (item.icon === "code") return "mods/space-menu/vscode.svg";
   if (item.icon === "rename") return "mods/workspace-chrome/square-pen.svg";
   if (item.icon === "worktree") return "mods/workspace-chrome/git-branch.svg";
   if (item.icon === "close") return "mods/workspace-chrome/x.svg";

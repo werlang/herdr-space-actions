@@ -32,7 +32,7 @@ O `spaces` original do Herdr continua intocado. Se o layout for resetado, reponh
 
 ## Pin
 
-O estado fica em `shared("spaces.pinned")`. Ao pinar, o mod cria uma aba `Pinned space` com o mod `space-pin`; ela é o que sobra quando os terminais/agents fecham. Ao despinar, essa aba é fechada. O item **Close** do menu continua fechando o space explicitamente.
+O estado fica em `shared("spaces.pinned")`. Ao pinar, o mod cria uma aba `Pinned space` com o mod `space-pin`; ela é o que sobra quando os terminais/agents fecham. O `tabs-ref` ativo esconde essa aba enquanto o space tem outras abas; ela aparece só quando é a única. Ao despinar, essa aba é fechada. O item **Close** do menu continua fechando o space explicitamente.
 
 ## Skill
 
