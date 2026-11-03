@@ -4,9 +4,14 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { props, spaces, panes, run, theme } from "herdr";
+import { props, spaces, panes, run, theme, shared } from "herdr";
 
 function place(space) {
+  const pinned = (shared("spaces.pinned") ?? []).includes(space.id);
+  if (pinned) {
+    const loc = (shared("spaces.pinned_locations") ?? {})[space.id];
+    if (loc) return loc;
+  }
   const tabs = new Set((space.tabs ?? []).map((tab) => tab.id));
   return panes().find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd || space.folder;
 }
@@ -18,7 +23,7 @@ export default class SpacePin extends View {
     const space = spaces().find((candidate) => candidate.id === value.space)
       ?? spaces().find((candidate) => candidate.active)
       ?? null;
-    const folder = space && place(space);
+    const folder = (space && place(space)) || value.folder;
     return v_flex().size_full().bg(t.surface).items_center().justify_center().gap(10).p(24)
       .child(svg("mods/space-pin/pin.svg").size(30).flex_none().text_color(t.accent))
       .child(div().text_size(15).text_color(t.foreground).child("Pinned space"))
@@ -26,7 +31,7 @@ export default class SpacePin extends View {
       .when(Boolean(folder), el => el.child(div().max_w(520).truncate().text_size(11).text_color(t.dim).child(folder)))
       .when(Boolean(space), el => el.child(h_flex().mt(4).id("space-pin-new").px(10).py(5).rounded(6)
         .bg(t.raised).text_size(12).text_color(t.foreground).hover((s) => s.bg(t.hover))
-        .on_click(() => run("tab.new", { space: space.id }))
+        .on_click(() => run("tab.new", { space: space.id, ...(folder ? { folder } : {}) }))
         .child("New terminal")));
   }
 }

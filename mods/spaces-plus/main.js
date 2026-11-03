@@ -19,9 +19,15 @@ function find(node, id) {
 // The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
-// Where a space is now: its first terminal's live folder, else where it was made.
+// Where a space is now: pinned spaces keep their pinned location,
+// while unpinned spaces follow their first terminal's live folder (else where made).
 // `ps`: panes(), read once by the caller (each read copies every pane).
 function place(s, ps) {
+  const pinned = (shared("spaces.pinned") ?? []).includes(s.id);
+  if (pinned) {
+    const loc = (shared("spaces.pinned_locations") ?? {})[s.id];
+    if (loc) return loc;
+  }
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
   return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
 }
@@ -430,6 +436,27 @@ export default class Spaces extends View {
       changed = true;
     }
     if (changed) setShared("space.colors", kept);
+    const pinnedIds = new Set(shared("spaces.pinned") ?? []);
+    const pinnedLocs = { ...(shared("spaces.pinned_locations") ?? {}) };
+    let locsChanged = false;
+    const ps = panes();
+    for (const p of sp) {
+      if (pinnedIds.has(p.id) && !pinnedLocs[p.id]) {
+        const tabs = new Set((p.tabs ?? []).map((c) => c.id));
+        const current = ps.find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd || p.folder;
+        if (current) {
+          pinnedLocs[p.id] = current;
+          locsChanged = true;
+        }
+      }
+    }
+    for (const id of Object.keys(pinnedLocs)) {
+      if (!pinnedIds.has(id)) {
+        delete pinnedLocs[id];
+        locsChanged = true;
+      }
+    }
+    if (locsChanged) setShared("spaces.pinned_locations", pinnedLocs);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
       .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
         .when(!collapsed, el => el.child("Spaces"))

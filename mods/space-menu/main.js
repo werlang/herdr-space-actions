@@ -7,8 +7,14 @@ import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { run, props, closeOverlay, openOverlay, theme, keys, spaces, panes, exec, hc, notify, shared, setShared } from "herdr";
 
-// Where a space is now: its first terminal's live folder, else where it was made.
+// Where a space is now: pinned spaces keep their pinned location,
+// while unpinned spaces follow their first terminal's live folder (else where made).
 function place(space) {
+  const pinned = (shared("spaces.pinned") ?? []).includes(space.id);
+  if (pinned) {
+    const loc = (shared("spaces.pinned_locations") ?? {})[space.id];
+    if (loc) return loc;
+  }
   const tabs = new Set((space.tabs ?? []).map((tab) => tab.id));
   return panes().find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd || space.folder;
 }
@@ -30,22 +36,40 @@ function hasPinTab(space) {
 // not take the space with it. Unpinning closes those placeholder tabs.
 function togglePin(space) {
   const ids = new Set(shared("spaces.pinned") ?? []);
+  const locs = { ...(shared("spaces.pinned_locations") ?? {}) };
+  const autoNamed = new Set(shared("spaces.pinned_auto_named") ?? []);
   if (ids.has(space.id)) {
     ids.delete(space.id);
+    delete locs[space.id];
+    const wasAutoNamed = autoNamed.has(space.id);
+    autoNamed.delete(space.id);
     setShared("spaces.pinned", [...ids]);
+    setShared("spaces.pinned_locations", locs);
+    setShared("spaces.pinned_auto_named", [...autoNamed]);
     const tabs = new Set((space.tabs ?? []).map((tab) => tab.id));
     for (const pane of panes().filter((pane) => pane.mod === "space-pin" && tabs.has(pane.tab))) {
       run("tab.close", { id: pane.tab });
     }
+    if (wasAutoNamed) {
+      run("space.rename", { id: space.id, name: "" });
+    }
     notify({ title: "Space unpinned", body: space.name, level: "info", timeout: 1800 });
     return;
   }
+  const loc = place(space);
   ids.add(space.id);
+  if (loc) locs[space.id] = loc;
+  if (!space.named && space.name) {
+    autoNamed.add(space.id);
+    run("space.rename", { id: space.id, name: space.name });
+  }
   setShared("spaces.pinned", [...ids]);
+  setShared("spaces.pinned_locations", locs);
+  setShared("spaces.pinned_auto_named", [...autoNamed]);
   if (!hasPinTab(space)) {
     const activeSpace = spaces().find((candidate) => candidate.active)?.id;
     const activeTab = (space.tabs ?? []).find((tab) => tab.active)?.id;
-    run("tab.new", { space: space.id, mod: "space-pin", name: "Pinned space", props: { space: space.id } });
+    run("tab.new", { space: space.id, mod: "space-pin", name: "Pinned space", props: { space: space.id, folder: loc } });
     if (activeSpace) run("space.select", { id: activeSpace });
     if (activeTab) run("tab.select", { id: activeTab });
   }

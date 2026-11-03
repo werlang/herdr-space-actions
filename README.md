@@ -11,18 +11,22 @@ The menu keeps the existing Rename, New worktree / Open worktree / Remove worktr
 
 ## Pin behavior
 
-Pinning writes the space id to `shared("spaces.pinned")` and adds a **Pinned space** tab backed by the `space-pin` mod. That tab is a placeholder, not a terminal: if every terminal and agent in the space closes, the placeholder tab is still there, so the space remains. The sidebar row shows a pin icon while it is pinned.
+Pinning writes the space id to `shared("spaces.pinned")`, locks its location into `shared("spaces.pinned_locations")`, and adds a **Pinned space** tab backed by the `space-pin` mod. That tab is a placeholder, not a terminal: if every terminal and agent in the space closes, the placeholder tab is still there, so the space remains. The sidebar row shows a pin icon while it is pinned.
+
+After pinning, the space's location is fixed: running `cd` in terminals inside the space does not change its tracked location, git repo, branch status, or VS Code target folder. Only unpinned spaces follow terminal `cd`.
+
+Opening a new terminal or agent via the UI `+` button (`new-menu-plus`) opens directly in the space's folder (or fixed pinned location), rather than the current directory of the focused terminal.
 
 While the space has other tabs, the active `tabs-ref` tab bar hides that placeholder; it appears only when it is the only tab left. That keeps the space alive without an extra tab in the way. If you use a different tab bar, the placeholder stays visible.
 
-Unpinning closes the placeholder tab. If it was the only tab left, the space closes (normal behavior). The explicit **Close** item still closes the space; the pin protects against an empty space, not against choosing Close.
+Unpinning closes the placeholder tab, unlocks its location so it follows terminal `cd` again, and if it was the only tab left, the space closes (normal behavior). The explicit **Close** item still closes the space; the pin protects against an empty space, not against choosing Close.
 
 ## Open in VS Code
 
 - Local space: `code -n <folder>`.
 - Remote space: `code --remote ssh-remote+<target> -n <folder>`, where `<target>` comes from `hc machine ls --json`. The remote must be configured in VS Code Remote SSH and the `code` CLI must be in `PATH`.
 
-The folder is the first live terminal's current folder, else the space's creation folder.
+For pinned spaces, the folder is the fixed pinned location. For unpinned spaces, the folder is the first live terminal's current folder, else the space's creation folder.
 
 ## Requirements
 
@@ -54,18 +58,19 @@ Then:
 herdr-app check ~/.config/herdr-app/mods/spaces-plus
 herdr-app check ~/.config/herdr-app/mods/space-menu
 herdr-app check ~/.config/herdr-app/mods/space-pin
+herdr-app check ~/.config/herdr-app/mods/new-menu-plus
 herdr-app status
 ```
 
 ## Repository
 
-Source of truth for the three mods. After edits:
+Source of truth for the mods. After edits:
 
 ```sh
 ./sync.sh
 ```
 
-It syncs `spaces-plus`, `space-menu`, and `space-pin` to the live Herdr folder and runs `herdr-app check` for each. See `AGENTS.md`.
+It syncs `spaces-plus`, `space-menu`, `space-pin`, and `new-menu-plus` to the live Herdr folder and runs `herdr-app check` for each. See `AGENTS.md`.
 
 ## Publish
 

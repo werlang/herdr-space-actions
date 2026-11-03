@@ -20,18 +20,21 @@ The menu is keyboard-navigable: ↑/↓ move, Enter runs, Esc closes.
 
 ## How it behaves
 
-- Pinning stores the space id in `shared("spaces.pinned")` and creates a **Pinned space** tab backed by `space-pin`. If every terminal/agent in the space closes, the placeholder tab remains, so the space stays.
+- Pinning stores the space id in `shared("spaces.pinned")`, locks its location in `shared("spaces.pinned_locations")`, and creates a **Pinned space** tab backed by `space-pin`. If every terminal/agent in the space closes, the placeholder tab remains, so the space stays.
+- After pinning, the space's location is fixed: terminal `cd` commands do not alter the space's location or its sidebar git info. Only unpinned spaces follow terminal `cd`.
+- Opening a new terminal or agent via the UI `+` button (`new-menu-plus`) opens directly in the space's folder (or fixed pinned location), rather than the current directory of the focused terminal.
 - The placeholder tab shows the pin icon, the space name, the folder, and a **New terminal** button.
-- Unpinning closes the placeholder tab. If it was the only tab, the space closes normally.
+- Unpinning closes the placeholder tab and unlocks its location to follow terminal `cd` again. If it was the only tab, the space closes normally.
 - **Close** still closes the space explicitly; the pin protects against an empty space, not against Close.
 - **Open in VS Code** runs `code -n <folder>` locally. For a remote space it runs `code --remote ssh-remote+<target> -n <folder>`, resolving the SSH target from `hc machine ls --json`.
-- The folder is the first live terminal's current folder, else the space's creation folder.
+- For pinned spaces, the folder is the fixed pinned location. For unpinned spaces, the folder is the first live terminal's current folder, else the space's creation folder.
 
 ## Built from
 
 - `mods/spaces-plus/` — clone of the shipped `spaces`; right-click opens `space-menu`, and rows show `pin.svg` for pinned ids.
 - `mods/space-menu/` — the popup menu, items, icons, keyboard handling, pin toggle, VS Code launch, and the existing worktree/close actions. It reads `shared("spaces.pinned")` and uses `tab.new`/`tab.close` for the placeholder.
 - `mods/space-pin/` — the placeholder pane; `tab.new { mod: "space-pin", props: { space } }` keeps a tab in the space alive.
+- `mods/new-menu-plus/` — the `+` menu clone ensuring new terminals and agents launch in the space's folder instead of the focused terminal's cd folder.
 - `shared("spaces.pinned")` — app-wide pinned space ids.
 - `hc(["machine", "ls", "--json"])` — remote SSH target for VS Code.
 - The personal layout `werlang.json` points the `spaces` block at `spaces-plus`.
