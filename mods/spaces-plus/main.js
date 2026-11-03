@@ -5,7 +5,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout } from "herdr";
+import { spaces, machines, panes, run, openOverlay, exec, hc, theme, shared, setShared, watchFolder, window, layout, nextCommand } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -34,6 +34,19 @@ function place(s, ps) {
 const rowHeight = ({ tree }) => (tree ? 28 : 30);
 const where = (s, ps) => JSON.stringify([s.machine ?? null, place(s, ps)]);
 const base = (path) => path.replace(/\/+$/, "").split("/").pop();
+
+// Where a new terminal tab should start: a pinned space's locked folder, else
+// the focused terminal's cwd (Herdr's own default), else the space's folder.
+// Bound to `spaces-plus.newTerminal` so cmd+t does not ignore a pin.
+function newTerminalFolder(s, ps) {
+  if (!s) return undefined;
+  const pinned = (shared("spaces.pinned") ?? []).includes(s.id);
+  if (pinned) {
+    const loc = (shared("spaces.pinned_locations") ?? {})[s.id];
+    if (loc) return loc;
+  }
+  return ps.find((p) => p.focused && !p.mod)?.cwd || s.folder || undefined;
+}
 // Changes made outside Herdr (an editor's save, a commit in another app): looked
 // for this often, in repos the list shows, while the window is in front.
 const FALLBACK = 60000;
@@ -76,6 +89,18 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
+    // A mod command instead of Herdr's built-in tab.new, so a pinned space
+    // starts its terminals where it is pinned, not where the space was made.
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const command = await nextCommand();
+        if (command !== "newTerminal") continue;
+        const space = spaces().find((s) => s.active);
+        const folder = newTerminalFolder(space, panes());
+        run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
+        cx.notify();
+      }
+    });
   }
 
   checkNew(cx) {
