@@ -38,6 +38,7 @@ export default class NewMenuPlus extends View {
     this.agents = shared(KNOWN)?.[where] ?? [];
     this.handle = cx.focus_handle();
     this.handle.focus();
+    if (props()?.overlay) setShared("new-menu.open", props().overlay);
     cx.timer.after(50, () => this.handle.focus());
     cx.timer.after(200, () => this.handle.focus());
     cx.spawn(async cx => {
@@ -49,11 +50,14 @@ export default class NewMenuPlus extends View {
       cx.notify();
     });
   }
+  close() {
+    setShared("new-menu.open", null);
+  }
   row(id, icon, name, action, hint = "", enabled = true) {
     const t = theme();
     return h_flex().id(id).h(31).px(9).gap(10).rounded(7).items_center().flex_none()
       .text_color(enabled ? t.foreground : t.dim).when(enabled, el => el.hover(s => s.bg(t.selected)))
-      .on_click(() => { if (enabled) { closeOverlay(props().overlay); action(); } })
+      .on_click(() => { if (enabled) { setShared("new-menu.open", null); closeOverlay(props().overlay); action(); } })
       .child(icon).child(div().flex_1().child(name)).child(div().text_size(11).text_color(t.dim).child(hint));
   }
   render() {
@@ -68,6 +72,7 @@ export default class NewMenuPlus extends View {
         if (e.modifiers.control || e.modifiers.platform) return;
         const agent = /^[1-9]$/.test(e.key) ? installed[Number(e.key) - 1] : null;
         if (!agent) return;
+        setShared("new-menu.open", null);
         closeOverlay(props().overlay);
         run("tab.new", { name: agent.name, space: space?.id, ...(folder ? { folder } : {}), argv: agent.run });
       })
