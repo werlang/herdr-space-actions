@@ -4,12 +4,16 @@ import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, setting
 
 function location() {
   const space = spaces().find((s) => s.active), f = focused();
-  const pane = f?.pane ? panes().find(p => p.pane === f.pane) : null;
-  const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
+  // Herdr can keep focus in the previous space when the selected one has no
+  // pane to focus (a pinned placeholder, say). Never read that pane's folder as
+  // this space's: fall back to the pinned location or the space folder.
+  const mine = Boolean(f && f.space === space?.id);
+  const pane = mine && f?.pane ? panes().find(p => p.pane === f.pane) : null;
+  const on = mine && f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
   // A pinned space is anchored to its pinned folder; terminals that cd
   // elsewhere must not move the panel (or the Git Graph button) off it.
   const pinned = (shared("spaces.pinned_locations") ?? {})[space?.id];
-  return { cwd: pinned || pane?.cwd || f?.cwd || space?.folder, on };
+  return { cwd: pinned || pane?.cwd || (mine ? f?.cwd : null) || space?.folder, on };
 }
 const key = () => JSON.stringify(location());
 // Reads write nothing under .git (no index refresh or lock, no fsmonitor cookie):
@@ -45,6 +49,11 @@ export default class Changes extends View {
     this.input.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
     this.refresh(cx);
     cx.timer.every(10000, (cx) => this.refresh(cx));
+    // Switching spaces does not re-render this panel by itself; check the
+    // active space cheaply (in memory, no git) so it follows the sidebar at
+    // once instead of waiting for the next full refresh. `render` does the
+    // actual reload when the location changes.
+    cx.timer.every(250, (cx) => { if (key() !== this.context) cx.notify(); });
   }
 
   watch(root, cx) {
