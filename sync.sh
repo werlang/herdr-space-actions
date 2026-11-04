@@ -4,7 +4,7 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 live="${HERDR_APP_HOME:-$HOME/.config/herdr-app}/mods"
 
-for mod in spaces-plus changes-plus space-menu space-pin new-menu-plus agents-plus; do
+for mod in spaces-plus changes-plus space-menu space-pin new-menu-plus agents-plus ref-menu tabs-ref; do
   src="$root/mods/$mod"
   if [ ! -d "$src" ]; then
     echo "missing $src" >&2
@@ -20,4 +20,4 @@ for mod in spaces-plus changes-plus space-menu space-pin new-menu-plus agents-pl
   herdr-app check "$live/$mod"
 done
 
-echo "Synced: spaces-plus changes-plus space-menu space-pin new-menu-plus agents-plus -> $live"
+echo "Synced: spaces-plus changes-plus space-menu space-pin new-menu-plus agents-plus ref-menu tabs-ref -> $live"
