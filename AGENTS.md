@@ -8,8 +8,6 @@ Fonte da verdade do plugin de ações de **space** do Herdr:
 - `mods/space-menu` — menu com **Pin space / Unpin space**, **Open in VS Code**, Rename, worktree e Close.
 - `mods/space-pin` — a aba placeholder que mantém um space pinado vivo quando todos os terminais/agents fecham.
 - `mods/new-menu-plus` — menu do botão `+` que abre terminais e agents no local do space (ou local fixado do pin) em vez do `cwd` do terminal com foco.
-- `mods/ref-menu` — clone do `menu` com **Copy reference** (endereço `hc` do terminal + contexto da aba/space/pasta) e **Pin tab / Unpin tab** no menu de uma aba.
-- `mods/tabs-ref` — clone da barra de abas que abre o `ref-menu` no right-click, mostra o pin, mantém abas pinadas à frente e atende `tabs-ref.closeTab`.
 
 ## Comando `newTerminal`
 
@@ -42,11 +40,11 @@ O Herdr lê os mods de `~/.config/herdr-app/mods/<nome>`. Depois de **qualquer**
 ./sync.sh
 ```
 
-O script copia `spaces-plus`, `changes-plus`, `space-menu`, `space-pin`, `new-menu-plus`, `agents-plus`, `ref-menu` e `tabs-ref` para a pasta live e roda `herdr-app check` neles. Não edite a pasta live diretamente.
+O script copia `spaces-plus`, `changes-plus`, `space-menu`, `space-pin`, `new-menu-plus` e `agents-plus` para a pasta live e roda `herdr-app check` neles. Não edite a pasta live diretamente.
 
 ## Ligação no layout
 
-O layout pessoal `~/.config/herdr-app/layouts/werlang.json` aponta os blocos `spaces`, `agents` e `tabs` para os clones, e o root `terminal_menu` para o `ref-menu`:
+O layout pessoal aponta os blocos `spaces` e `agents` para os clones:
 
 ```json
 {
@@ -66,33 +64,19 @@ O layout pessoal `~/.config/herdr-app/layouts/werlang.json` aponta os blocos `sp
 
 ```json
 {
-  "id": "tabs",
+  "id": "changes",
   "type": "block",
-  "content": { "mod": "tabs-ref" }
+  "content": { "mod": "changes-plus" }
 }
 ```
 
-```json
-"terminal_menu": "ref-menu"
-```
-
-Os `spaces`, `agents`, `tabs` e `menu` originais do Herdr continuam intocados. Se o layout for resetado, reponha `spaces-plus`, `agents-plus`, `tabs-ref` e `ref-menu`.
+Os `spaces`, `agents` e `changes` originais do Herdr continuam intocados.
 
 ## Pin
 
-O estado fica em `shared("spaces.pinned")` e `shared("spaces.pinned_locations")`. Ao pinar, o mod congela o local do space naquele momento e cria uma aba `Pinned space` com o mod `space-pin`; ela é o que sobra quando os terminais/agents fecham. Terminais executando `cd` dentro de um space pinado não alteram seu local nem sua ramificação/status git; apenas spaces não pinados acompanham o `cd` dos terminais. O `tabs-ref` ativo esconde a aba placeholder enquanto o space tem outras abas; ela aparece só quando é a única. Ao despinar, a aba é fechada e o space volta a seguir o `cd` dos terminais. O item **Close** do menu continua fechando o space explicitamente.
+O estado fica em `shared("spaces.pinned")` e `shared("spaces.pinned_locations")`. Ao pinar, o mod congela o local do space naquele momento e cria uma aba `Pinned space` com o mod `space-pin`; ela é o que sobra quando os terminais/agents fecham. Terminais executando `cd` dentro de um space pinado não alteram seu local nem sua ramificação/status git; apenas spaces não pinados acompanham o `cd` dos terminais. Ao despinar, a aba é fechada e o space volta a seguir o `cd` dos terminais. O item **Close** do menu continua fechando o space explicitamente.
 
-## Tabs pinadas
-
-O estado das abas fica em `shared("tabs.pinned")` (ids de aba). O right-click numa aba mostra **Pin tab / Unpin tab**; a aba pinada ganha o ícone de pin e vai para o começo das abas regulares. O `tabs-ref` reordena o modelo via `tab.move` (pinned, depois não pinadas, depois a placeholder `space-pin`), então `cmd+1..9`, `tab.next` e arrastar continuam coerentes. A lista sobrevive fechar/abrir o Herdr; ids de abas fechadas ficam nela sem efeito, porque ids de aba não são reaproveitados.
-
-O `cmd+w` deve ser ligado a `tabs-ref.closeTab`:
-
-```json
-"cmd-w": "tabs-ref.closeTab"
-```
-
-Numa aba pinada ele não fecha: seleciona a aba mais próxima (empate vai para a direita). Numa aba normal ele chama `tab.close` como antes. O X da aba e o **Close** do menu ainda fecham explicitamente, inclusive uma aba pinada. `<mod>.<command>` precisa do mod montado no layout; sem o `tabs-ref`, mantenha `cmd-w` em `tab.close`.
+> Se você deseja que a aba placeholder seja escondida automaticamente enquanto houver outras abas no space, instale o pacote `herdr-tab-actions` (`tabs-ref`).
 
 ## Skill
 

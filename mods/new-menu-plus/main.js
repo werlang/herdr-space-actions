@@ -9,7 +9,7 @@ import { theme, spaces, panes, knownAgents, run, openOverlay, closeOverlay, prop
 const KNOWN = "new-menu.agents";
 
 function shortcut(name) {
-  const k = keys().find(b => b.section === "global" && b.action === name);
+  const k = keys().find(b => b.section === "global" && (b.action === name || (name === "tab.new" && b.action === "spaces-plus.newTerminal")));
   if (!k?.keys.trim()) return "";
   const mac = window()?.platform === "macos";
   const names = mac ? { ctrl: "⌃", alt: "⌥", shift: "⇧", cmd: "⌘", fn: "fn" } : { ctrl: "Ctrl", alt: "Alt", shift: "Shift", cmd: "Super", fn: "Fn" };
@@ -38,6 +38,8 @@ export default class NewMenuPlus extends View {
     this.agents = shared(KNOWN)?.[where] ?? [];
     this.handle = cx.focus_handle();
     this.handle.focus();
+    cx.timer.after(50, () => this.handle.focus());
+    cx.timer.after(200, () => this.handle.focus());
     cx.spawn(async cx => {
       try {
         this.agents = await knownAgents({ on: machine });
@@ -63,7 +65,7 @@ export default class NewMenuPlus extends View {
     return v_flex().min_h(0).w_full().h(Math.min(491, 167 + Math.max(1, choices.length) * 31)).bg(t.popover).p(5).text_size(12.8)
       .id("new-menu").track_focus(this.handle)
       .on_key_down((e) => {
-        if (e.modifiers.control || e.modifiers.platform || e.modifiers.alt) return;
+        if (e.modifiers.control || e.modifiers.platform) return;
         const agent = /^[1-9]$/.test(e.key) ? installed[Number(e.key) - 1] : null;
         if (!agent) return;
         closeOverlay(props().overlay);
