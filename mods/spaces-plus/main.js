@@ -91,6 +91,22 @@ export function tone(t, status) {
   return t[status] ?? t.unknown;
 }
 
+const isObject = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * Safely parse a JSON value from localStorage with a fallback and type guard.
+ */
+function readJSON(key, fallback, isValid) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const val = JSON.parse(raw);
+    return isValid(val) ? val : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default class Spaces extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
@@ -101,7 +117,7 @@ export default class Spaces extends View {
     this.busy = {}; // pane -> an agent working or a program in front of its shell
     this.ready = {}; // machine -> its layout was readable at the last look
     this.at = {}; // space -> its where() at the last look
-    this.watching = new Set(); // local repos' git folders
+    this.watching = new Map(); // local repos' git folders: repo -> loop token
     // Spaces made while this runs wait (at most a moment) for their git, so a
     // worktree appears under its repo instead of jumping there.
     this.shown = new Set(spaces().map((s) => s.id));
@@ -109,9 +125,9 @@ export default class Spaces extends View {
     this.pressed = null;
     this.over = null;
     this.machines = [];
-    this.reconnecting = JSON.parse(localStorage.getItem("machines.reconnecting") ?? "{}");
+    this.reconnecting = readJSON("machines.reconnecting", {}, isObject);
     for (const state of Object.values(this.reconnecting)) state.busy = false;
-    this.folded = new Set(JSON.parse(localStorage.getItem("machines.folded") ?? "[]"));
+    this.folded = new Set(readJSON("machines.folded", [], Array.isArray));
     this.refreshMachines(cx);
     cx.timer.every(15000, cx => this.refreshMachines(cx));
     // `git status` walks the whole tree, on another machine a process there:
@@ -246,13 +262,16 @@ export default class Spaces extends View {
         for (const key of keys) await this.check(key, cx);
       }
       const used = new Set(Object.values(this.git).filter(Boolean).map((g) => JSON.parse(g.repo)).filter(([on]) => !on).map(([, repo]) => repo));
-      for (const repo of this.watching) if (!used.has(repo)) this.watching.delete(repo);
+      for (const repo of this.watching.keys()) if (!used.has(repo)) this.watching.delete(repo);
       this.refreshing = false;
       cx.notify();
     });
   }
 
-  // One place's git: branch, ahead/behind, its repo.
+  /**
+   * One place's git: branch, ahead/behind, its repo.
+   * If rev-parse fails, marks the key unsure, preserves previous git info, and returns.
+   */
   async check(key, cx) {
     const [on, cwd] = JSON.parse(key);
     this.checked[key] = Date.now();
@@ -270,6 +289,11 @@ export default class Spaces extends View {
       // The repo's own .git folder names it; a worktree's top differs from it.
       const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
       const common = await exec("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd, on });
+      if (top.code !== 0 || common.code !== 0) {
+        this.unsure.add(key);
+        this.git[key] ??= null;
+        return;
+      }
       const repo = common.stdout.trim();
       const name = repo.endsWith("/.git") ? base(repo.slice(0, -5)) : base(repo).replace(/\.git$/, "");
       const info = {
@@ -301,17 +325,24 @@ export default class Spaces extends View {
     }
   }
 
+  /**
+   * Watch a local git repo folder for changes.
+   * Tracks active loops via Map<repo, token> so stale loops terminate when a repo is revisited.
+   */
   watch(repo, cx) {
     if (this.watching.has(repo)) return;
-    this.watching.add(repo);
+    const token = {};
+    this.watching.set(repo, token);
     cx.spawn(async (cx) => {
       try {
-        while (this.watching.has(repo)) {
+        while (this.watching.get(repo) === token) {
           await watchFolder(repo);
           const mine = JSON.stringify([null, repo]);
-          if (this.watching.has(repo)) this.refreshGit(Object.keys(this.git).filter((k) => this.git[k]?.repo === mine), cx);
+          if (this.watching.get(repo) === token) this.refreshGit(Object.keys(this.git).filter((k) => this.git[k]?.repo === mine), cx);
         }
-      } catch { this.watching.delete(repo); }
+      } catch {
+        if (this.watching.get(repo) === token) this.watching.delete(repo);
+      }
     });
   }
 
@@ -574,16 +605,15 @@ export default class Spaces extends View {
     }
     const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
     const sp = spaces();
-    const ids = new Set(sp.map(p => p.id));
-    const kept = Object.fromEntries(Object.entries(shared("space.colors") ?? {}).filter(([id]) => ids.has(id)));
-    let changed = Object.keys(kept).length !== Object.keys(shared("space.colors") ?? {}).length;
+    const colors = { ...(shared("space.colors") ?? {}) };
+    let changed = false;
     for (const p of sp) {
-      if (kept[p.id] || p.name === "~") continue;
-      const uses = c => Object.values(kept).filter(v => v === c).length;
-      kept[p.id] = palette.reduce((best, c) => uses(c) < uses(best) ? c : best);
+      if (colors[p.id] || p.name === "~") continue;
+      const uses = c => sp.filter(s => colors[s.id] === c).length;
+      colors[p.id] = palette.reduce((best, c) => uses(c) < uses(best) ? c : best);
       changed = true;
     }
-    if (changed) setShared("space.colors", kept);
+    if (changed) setShared("space.colors", colors);
     const pinnedIds = new Set(shared("spaces.pinned") ?? []);
     const pinnedLocs = { ...(shared("spaces.pinned_locations") ?? {}) };
     let locsChanged = false;

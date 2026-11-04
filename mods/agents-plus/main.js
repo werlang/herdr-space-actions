@@ -40,13 +40,18 @@ function title(tab, l) {
   const telling = live && live !== prog && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
   return (tab.name === prog || !tab.named) && telling ? live : tab.name;
 }
-// The space an agent lives in. A sub-agent without a pane follows its parent
-// chain until an agent that has a space turns up.
+/**
+ * The space an agent lives in. A sub-agent without a pane follows its parent
+ * chain until an agent that has a space turns up, breaking any cycle.
+ */
 function spaceOf(term, live = agents()) {
   const known = new Map(live.map((a) => [a.address, a.space]));
   if (known.has(term.address)) return known.get(term.address);
   const byAddress = new Map(terminals().map((t) => [t.address, t]));
-  for (let at = term.parent; at; at = byAddress.get(at)?.parent) {
+  const visited = new Set();
+  if (term.address) visited.add(term.address);
+  for (let at = term.parent; at && !visited.has(at); at = byAddress.get(at)?.parent) {
+    visited.add(at);
     if (known.has(at)) return known.get(at);
   }
   return null;
@@ -81,13 +86,29 @@ function icon(p, size, color) {
   return p.tint ? svg(p.icon).size(size).flex_none().text_color(color) : image(p.icon).w(size).h(size).flex_none();
 }
 
+const isObject = (v) => Boolean(v) && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * Safely parse a JSON value from localStorage with a fallback and type guard.
+ */
+function readJSON(key, fallback, isValid) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const val = JSON.parse(raw);
+    return isValid(val) ? val : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
     this.folded = new Set();
     // Each agent's last state and when it changed (ms), kept across restarts.
-    this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
-    this.pendingPins = JSON.parse(localStorage.getItem("pins") ?? "[]");
+    this.changed = readJSON("changed", {}, isObject);
+    this.pendingPins = readJSON("pins", [], Array.isArray);
     if (!this.pendingPins.length) localStorage.removeItem("pins");
     this.migratingPins = new Set();
     cx.timer.every(30000, (cx) => cx.notify());

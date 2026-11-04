@@ -50,9 +50,6 @@ export default class NewMenuPlus extends View {
       cx.notify();
     });
   }
-  close() {
-    setShared("new-menu.open", null);
-  }
   row(id, icon, name, action, hint = "", enabled = true) {
     const t = theme();
     return h_flex().id(id).h(31).px(9).gap(10).rounded(7).items_center().flex_none()

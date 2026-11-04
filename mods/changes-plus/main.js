@@ -38,6 +38,7 @@ function diffRows(lines) {
 export default class Changes extends View {
   init(_props, cx) {
     this.files = []; this.rows = []; this.diffWidth = 0; this.message = ""; this.handle = cx.focus_handle();
+    this.watched = null; this.watchToken = null;
     this.input = InputState.new({ placeholder: "Commit message" });
     this.input.on("change", (_e, cx) => {
       const hadMessage = Boolean(this.message.trim());
@@ -56,16 +57,26 @@ export default class Changes extends View {
     cx.timer.every(250, (cx) => { if (key() !== this.context) cx.notify(); });
   }
 
+  /**
+   * Watch the repository root folder for changes.
+   * Uses a per-loop token so revisiting a repo invalidates any previously parked watcher loop.
+   */
   watch(root, cx) {
     if (this.on || this.watched === root) return;
     this.watched = root;
+    const token = this.watchToken = {};
     cx.spawn(async (cx) => {
       try {
-        while (this.watched === root) {
+        while (this.watchToken === token && this.watched === root) {
           await watchFolder(root);
-          if (this.watched === root) this.refresh(cx);
+          if (this.watchToken === token && this.watched === root) this.refresh(cx);
         }
-      } catch { this.watched = null; }
+      } catch {
+        if (this.watchToken === token) {
+          this.watched = null;
+          this.watchToken = null;
+        }
+      }
     });
   }
 
@@ -74,7 +85,8 @@ export default class Changes extends View {
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
       this.context = context; this.root = null; this.files = []; this.open = null;
-      this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
+      this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null;
+      this.watched = null; this.watchToken = null; this.closed = false; this.limited = false;
     }
     if (!cwd) return;
     this.loading = true;
