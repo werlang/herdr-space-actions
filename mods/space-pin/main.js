@@ -144,7 +144,7 @@ export default class SpacePin extends View {
         this.launch(agent.run, agent.name);
       })
       .child(v_flex().items_center().gap(6).flex_none()
-        .child(svg("mods/space-pin/pin.svg").size(30).flex_none().text_color(t.accent))
+        .child(svg("mods/space-pin/new-tab.svg").size(30).flex_none().text_color(t.accent))
         .child(div().text_size(15).text_color(t.foreground).child("New tab"))
         .when(Boolean(space), (el) => el.child(div().text_size(12).text_color(t.muted).child(space.name)))
         .when(Boolean(folder), (el) => el.child(div().max_w(520).truncate().text_size(11).text_color(t.dim).child(folder))))
