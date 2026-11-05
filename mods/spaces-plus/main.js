@@ -33,6 +33,11 @@ function place(s, ps) {
   const tabs = new Set((s.tabs ?? []).map((c) => c.id));
   return ps.find((p) => tabs.has(p.tab) && p.cwd)?.cwd || s.folder;
 }
+
+function hasPinTab(s, ps = panes()) {
+  const tabs = new Set((s.tabs ?? []).map((c) => c.id));
+  return ps.some((p) => p.mod === "space-pin" && tabs.has(p.tab));
+}
 // A repo row carries a second, smaller line (branch and state); the rest stay
 // one line tall.
 const rowHeight = ({ tree, g }) => (g ? 38 : tree ? 28 : 30);
@@ -125,6 +130,7 @@ export default class Spaces extends View {
     this.pressed = null;
     this.over = null;
     this.machines = [];
+    this.pendingPins = new Set();
     this.reconnecting = readJSON("machines.reconnecting", {}, isObject);
     for (const state of Object.values(this.reconnecting)) state.busy = false;
     this.folded = new Set(readJSON("machines.folded", [], Array.isArray));
@@ -133,6 +139,7 @@ export default class Spaces extends View {
     // `git status` walks the whole tree, on another machine a process there:
     // only when its answer could have changed (see `due`).
     cx.timer.every(250, (cx) => this.checkNew(cx));
+    cx.timer.after(100, () => this.ensurePinTabs());
     // A mod command instead of Herdr's built-in tab.new, so a pinned space
     // starts its terminals where it is pinned, not where the space was made.
     cx.spawn(async (cx) => {
@@ -150,10 +157,41 @@ export default class Spaces extends View {
   checkNew(cx) {
     const now = Date.now();
     const sp = spaces();
+    const ps = panes();
+    this.ensurePinTabs(sp, ps);
     for (const s of sp) if (!this.shown.has(s.id)) this.born[s.id] ??= now;
-    const due = this.due(now, sp, panes());
+    const due = this.due(now, sp, ps);
     if (due.size) this.refreshGit(due, cx);
     if (sp.some((s) => !this.shown.has(s.id))) cx.notify();
+  }
+
+  /**
+   * Ensure every open pinned space retains its space-pin placeholder tab,
+   * restoring it if closed, lost after an unclean restart, or never created.
+   */
+  ensurePinTabs(sp = spaces(), ps = panes()) {
+    const pinnedIds = new Set(shared("spaces.pinned") ?? []);
+    const pinnedLocs = shared("spaces.pinned_locations") ?? {};
+    const openIds = new Set(sp.map((s) => s.id));
+    for (const id of this.pendingPins) if (!openIds.has(id)) this.pendingPins.delete(id);
+    const activeSpace = sp.find((candidate) => candidate.active)?.id;
+    const activeTab = (sp.find((candidate) => candidate.id === activeSpace)?.tabs ?? []).find((tab) => tab.active)?.id;
+    for (const p of sp) {
+      if (!pinnedIds.has(p.id)) {
+        this.pendingPins.delete(p.id);
+        continue;
+      }
+      if (hasPinTab(p, ps)) {
+        this.pendingPins.delete(p.id);
+        continue;
+      }
+      if (this.pendingPins.has(p.id)) continue;
+      this.pendingPins.add(p.id);
+      const loc = pinnedLocs[p.id] || place(p, ps);
+      run("tab.new", { space: p.id, mod: "space-pin", name: "Pinned space", props: { space: p.id, folder: loc } });
+      if (activeSpace) run("space.select", { id: activeSpace });
+      if (activeTab) run("tab.select", { id: activeTab });
+    }
   }
 
   // Places whose git could have changed: new ones (a new space, a cd), where a
