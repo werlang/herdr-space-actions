@@ -152,9 +152,24 @@ export default class Spaces extends View {
         const holder = (space.tabs ?? []).find((t) => allPanes.some((p) => p.tab === t.id && p.mod === "space-pin"));
         if (holder) {
           run("tab.select", { id: holder.id });
+          const pane = allPanes.find((p) => p.tab === holder.id);
+          if (pane) {
+            run("pane.focus", { pane: pane.pane });
+            cx.timer.after(20, () => run("pane.focus", { pane: pane.pane }));
+            cx.timer.after(80, () => run("pane.focus", { pane: pane.pane }));
+          }
         } else {
           const loc = (shared("spaces.pinned_locations") ?? {})[space.id] || space.folder;
           run("tab.new", { space: space.id, mod: "space-pin", name: "New tab", props: { space: space.id, folder: loc } });
+          cx.timer.after(40, () => {
+            const ps = panes();
+            const sp = spaces().find((s) => s.active);
+            const h = (sp?.tabs ?? []).find((t) => ps.some((p) => p.tab === t.id && p.mod === "space-pin"));
+            if (h) {
+              const pane = ps.find((p) => p.tab === h.id);
+              if (pane) run("pane.focus", { pane: pane.pane });
+            }
+          });
         }
         cx.notify();
       }
@@ -188,7 +203,9 @@ export default class Spaces extends View {
         this.pendingPins.delete(p.id);
         continue;
       }
-      if (hasPinTab(p, ps)) {
+      const tabs = p.tabs ?? [];
+      const hasRegular = tabs.some((t) => !ps.some((pane) => pane.tab === t.id && pane.mod === "space-pin"));
+      if (hasRegular || hasPinTab(p, ps)) {
         this.pendingPins.delete(p.id);
         continue;
       }

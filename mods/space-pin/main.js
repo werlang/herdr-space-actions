@@ -4,7 +4,7 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { props, spaces, panes, run, theme, shared, setShared, knownAgents, window, keys } from "herdr";
+import { props, spaces, panes, run, theme, shared, setShared, knownAgents, window, keys, nextCommand } from "herdr";
 
 // The last agents each machine reported, shared with new-menu / new-menu-plus.
 const KNOWN = "new-menu.agents";
@@ -37,11 +37,43 @@ function place(space) {
 }
 
 export default class SpacePin extends View {
+  isViewVisible() {
+    const space = spaces().find((s) => s.active);
+    if (!space) return false;
+    const activeTab = (space.tabs ?? []).find((t) => t.active);
+    if (!activeTab) return false;
+    const allPanes = panes();
+    return allPanes.some((pane) => pane.tab === activeTab.id && pane.mod === "space-pin");
+  }
+
   init(_props, cx) {
     this.handle = cx.focus_handle();
     this.handle.focus();
     cx.timer.after(50, () => this.handle?.focus());
     cx.timer.after(200, () => this.handle?.focus());
+
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const command = await nextCommand();
+        if (command === "focus") {
+          this.handle.focus();
+          cx.notify();
+        }
+      }
+    });
+
+    cx.timer.every(100, () => {
+      if (this.isViewVisible()) {
+        const pane = panes().find((p) => p.mod === "space-pin" && p.tab === spaces().find((s) => s.active)?.tabs?.find((t) => t.active)?.id);
+        if (pane && !pane.focused) {
+          run("pane.focus", { pane: pane.pane });
+        }
+        if (!this.handle?.is_focused()) {
+          this.handle?.focus();
+        }
+      }
+    });
+
     const space = spaces().find((s) => s.id === props()?.space) ?? spaces().find((s) => s.active);
     const where = space?.machine ?? "";
     this.agents = shared(KNOWN)?.[where] ?? [];
@@ -54,6 +86,26 @@ export default class SpacePin extends View {
       }
       cx.notify();
     });
+  }
+
+  launch(argv, name) {
+    const value = props() ?? {};
+    const space = spaces().find((candidate) => candidate.id === value.space)
+      ?? spaces().find((candidate) => candidate.active)
+      ?? null;
+    const folder = (space && place(space)) || value.folder;
+    const allPanes = panes();
+    const myTab = (space?.tabs ?? []).find((t) => t.active && allPanes.some((p) => p.tab === t.id && p.mod === "space-pin"));
+
+    if (name && argv) {
+      run("tab.new", { name, space: space?.id, ...(folder ? { folder } : {}), argv });
+    } else {
+      run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
+    }
+
+    if (myTab?.id) {
+      run("tab.close", { id: myTab.id });
+    }
   }
 
   row(id, icon, name, action, hint = "") {
@@ -80,15 +132,16 @@ export default class SpacePin extends View {
 
     return v_flex().size_full().bg(t.surface).items_center().justify_center().p(24)
       .track_focus(this.handle)
+      .on_mouse_down("left", () => { this.handle?.focus(); })
       .on_key_down((e) => {
         if (e.modifiers.control || e.modifiers.platform || e.modifiers.alt) return;
         if (e.key === "Enter" || e.key === "t" || e.key === "T") {
-          run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
+          this.launch();
           return;
         }
         const agent = /^[1-9]$/.test(e.key) ? installed[Number(e.key) - 1] : null;
         if (!agent) return;
-        run("tab.new", { name: agent.name, space: space?.id, ...(folder ? { folder } : {}), argv: agent.run });
+        this.launch(agent.run, agent.name);
       })
       .child(v_flex().items_center().gap(6).flex_none()
         .child(svg("mods/space-pin/pin.svg").size(30).flex_none().text_color(t.accent))
@@ -98,8 +151,8 @@ export default class SpacePin extends View {
       .child(v_flex().id("space-pin-menu").mt(16).w(260).flex_none().h(menuHeight)
         .rounded(8).bg(t.popover).border_1().border_color(t.border).p(5).text_size(12.8)
         .when(count * 31 > 270, (el) => el.overflow_y_scrollbar())
-        .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) }), "T"))
+        .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => this.launch(), "T"))
         .children(installed.map((a, i) => this.row(a.key, a.tint ? svg(a.icon).size(14).text_color(t.foreground) : image(a.icon).size(14), a.name,
-          () => run("tab.new", { name: a.name, space: space?.id, ...(folder ? { folder } : {}), argv: a.run }), i < 9 ? String(i + 1) : ""))));
+          () => this.launch(a.run, a.name), i < 9 ? String(i + 1) : ""))));
   }
 }
