@@ -61,8 +61,9 @@ export default class NewMenuPlus extends View {
     const t = theme();
     const space = spaces().find(s => s.active);
     const folder = spaceFolder(space);
-    const installed = this.agents.filter(a => a.installed);
-    const choices = [...installed, ...this.agents.filter(a => !a.installed).slice(0, 2)];
+    const byName = (a, b) => (a.name ?? "").localeCompare(b.name ?? "");
+    const installed = this.agents.filter(a => a.installed).sort(byName);
+    const choices = [...installed, ...this.agents.filter(a => !a.installed).sort(byName).slice(0, 2)];
     return v_flex().min_h(0).w_full().h(Math.min(491, 167 + Math.max(1, choices.length) * 31)).bg(t.popover).p(5).text_size(12.8)
       .id("new-menu").track_focus(this.handle)
       .on_key_down((e) => {
