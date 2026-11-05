@@ -68,13 +68,19 @@ export default class NewMenuPlus extends View {
       .id("new-menu").track_focus(this.handle)
       .on_key_down((e) => {
         if (e.modifiers.control || e.modifiers.platform) return;
+        if (e.key === "t" || e.key === "T") {
+          setShared("new-menu.open", null);
+          closeOverlay(props().overlay);
+          run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
+          return;
+        }
         const agent = /^[1-9]$/.test(e.key) ? installed[Number(e.key) - 1] : null;
         if (!agent) return;
         setShared("new-menu.open", null);
         closeOverlay(props().overlay);
         run("tab.new", { name: agent.name, space: space?.id, ...(folder ? { folder } : {}), argv: agent.run });
       })
-      .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) }), shortcut("tab.new")))
+      .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) }), "T"))
       .child(div().px(9).pt(8).pb(4).text_size(11).text_color(t.dim).child("Start an agent"))
       .child(v_flex().flex_1().min_h(0).overflow_y_scrollbar()
         .children(choices.map((a, i) => this.row(a.key, a.tint ? svg(a.icon).size(14).text_color(t.foreground) : image(a.icon).size(14), a.name,
