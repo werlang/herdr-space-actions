@@ -145,10 +145,17 @@ export default class Spaces extends View {
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command !== "newTerminal") continue;
+        if (command !== "newTerminal" && command !== "newTab") continue;
         const space = spaces().find((s) => s.active);
-        const folder = newTerminalFolder(space, panes());
-        run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
+        if (!space) continue;
+        const allPanes = panes();
+        const holder = (space.tabs ?? []).find((t) => allPanes.some((p) => p.tab === t.id && p.mod === "space-pin"));
+        if (holder) {
+          run("tab.select", { id: holder.id });
+        } else {
+          const loc = (shared("spaces.pinned_locations") ?? {})[space.id] || space.folder;
+          run("tab.new", { space: space.id, mod: "space-pin", name: "New tab", props: { space: space.id, folder: loc } });
+        }
         cx.notify();
       }
     });
@@ -188,7 +195,7 @@ export default class Spaces extends View {
       if (this.pendingPins.has(p.id)) continue;
       this.pendingPins.add(p.id);
       const loc = pinnedLocs[p.id] || place(p, ps);
-      run("tab.new", { space: p.id, mod: "space-pin", name: "Pinned space", props: { space: p.id, folder: loc } });
+      run("tab.new", { space: p.id, mod: "space-pin", name: "New tab", props: { space: p.id, folder: loc } });
       if (activeSpace) run("space.select", { id: activeSpace });
       if (activeTab) run("tab.select", { id: activeTab });
     }

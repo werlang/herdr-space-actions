@@ -69,7 +69,7 @@ function togglePin(space) {
   if (!hasPinTab(space)) {
     const activeSpace = spaces().find((candidate) => candidate.active)?.id;
     const activeTab = (space.tabs ?? []).find((tab) => tab.active)?.id;
-    run("tab.new", { space: space.id, mod: "space-pin", name: "Pinned space", props: { space: space.id, folder: loc } });
+    run("tab.new", { space: space.id, mod: "space-pin", name: "New tab", props: { space: space.id, folder: loc } });
     if (activeSpace) run("space.select", { id: activeSpace });
     if (activeTab) run("tab.select", { id: activeTab });
   }

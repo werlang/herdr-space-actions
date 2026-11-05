@@ -82,7 +82,7 @@ export default class SpacePin extends View {
       .track_focus(this.handle)
       .on_key_down((e) => {
         if (e.modifiers.control || e.modifiers.platform || e.modifiers.alt) return;
-        if (e.key === "Enter") {
+        if (e.key === "Enter" || e.key === "t" || e.key === "T") {
           run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
           return;
         }
@@ -92,13 +92,13 @@ export default class SpacePin extends View {
       })
       .child(v_flex().items_center().gap(6).flex_none()
         .child(svg("mods/space-pin/pin.svg").size(30).flex_none().text_color(t.accent))
-        .child(div().text_size(15).text_color(t.foreground).child("Pinned space"))
+        .child(div().text_size(15).text_color(t.foreground).child("New tab"))
         .when(Boolean(space), (el) => el.child(div().text_size(12).text_color(t.muted).child(space.name)))
         .when(Boolean(folder), (el) => el.child(div().max_w(520).truncate().text_size(11).text_color(t.dim).child(folder))))
       .child(v_flex().id("space-pin-menu").mt(16).w(260).flex_none().h(menuHeight)
         .rounded(8).bg(t.popover).border_1().border_color(t.border).p(5).text_size(12.8)
         .when(count * 31 > 270, (el) => el.overflow_y_scrollbar())
-        .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) }), shortcut("tab.new")))
+        .child(this.row("terminal", svg("icons/shell.svg").size(14), "Terminal", () => run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) }), "T"))
         .children(installed.map((a, i) => this.row(a.key, a.tint ? svg(a.icon).size(14).text_color(t.foreground) : image(a.icon).size(14), a.name,
           () => run("tab.new", { name: a.name, space: space?.id, ...(folder ? { folder } : {}), argv: a.run }), i < 9 ? String(i + 1) : ""))));
   }
