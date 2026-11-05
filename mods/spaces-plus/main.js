@@ -18,6 +18,14 @@ function find(node, id) {
   return null;
 }
 
+// Whether a mod is mounted in the current layout, not merely installed on disk.
+function mounted(node, mod) {
+  if (!node || typeof node !== "object") return false;
+  if (node.content === mod || node.mod === mod) return true;
+  if (node.content && typeof node.content === "object" && node.content.mod === mod) return true;
+  return (node.children ?? []).some((child) => mounted(child, mod));
+}
+
 // The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
 const narrow = () => (find(layout(), "sidebar")?.size?.px ?? Infinity) < 160;
 
@@ -142,35 +150,15 @@ export default class Spaces extends View {
     cx.timer.after(100, () => this.ensurePinTabs());
     // A mod command instead of Herdr's built-in tab.new, so a pinned space
     // starts its terminals where it is pinned, not where the space was made.
+    // Opening the New tab screen is `tabs-ref.newTab` in herdr-tab-actions;
+    // keeping it here too would give `cmd-t` two competing owners.
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command !== "newTerminal" && command !== "newTab") continue;
+        if (command !== "newTerminal") continue;
         const space = spaces().find((s) => s.active);
-        if (!space) continue;
-        const allPanes = panes();
-        const holder = (space.tabs ?? []).find((t) => allPanes.some((p) => p.tab === t.id && p.mod === "space-pin"));
-        if (holder) {
-          run("tab.select", { id: holder.id });
-          const pane = allPanes.find((p) => p.tab === holder.id);
-          if (pane) {
-            run("pane.focus", { pane: pane.pane });
-            cx.timer.after(20, () => run("pane.focus", { pane: pane.pane }));
-            cx.timer.after(80, () => run("pane.focus", { pane: pane.pane }));
-          }
-        } else {
-          const loc = (shared("spaces.pinned_locations") ?? {})[space.id] || space.folder;
-          run("tab.new", { space: space.id, mod: "space-pin", name: "New tab", props: { space: space.id, folder: loc } });
-          cx.timer.after(40, () => {
-            const ps = panes();
-            const sp = spaces().find((s) => s.active);
-            const h = (sp?.tabs ?? []).find((t) => ps.some((p) => p.tab === t.id && p.mod === "space-pin"));
-            if (h) {
-              const pane = ps.find((p) => p.tab === h.id);
-              if (pane) run("pane.focus", { pane: pane.pane });
-            }
-          });
-        }
+        const folder = newTerminalFolder(space, panes());
+        run("tab.new", { space: space?.id, ...(folder ? { folder } : {}) });
         cx.notify();
       }
     });
@@ -190,6 +178,8 @@ export default class Spaces extends View {
   /**
    * Ensure every open pinned space retains its space-pin placeholder tab,
    * restoring it if closed, lost after an unclean restart, or never created.
+   * When `tabs-ref` is mounted, it owns the active space; this is the fallback
+   * for background spaces and for layouts without herdr-tab-actions.
    */
   ensurePinTabs(sp = spaces(), ps = panes()) {
     const pinnedIds = new Set(shared("spaces.pinned") ?? []);
@@ -198,8 +188,16 @@ export default class Spaces extends View {
     for (const id of this.pendingPins) if (!openIds.has(id)) this.pendingPins.delete(id);
     const activeSpace = sp.find((candidate) => candidate.active)?.id;
     const activeTab = (sp.find((candidate) => candidate.id === activeSpace)?.tabs ?? []).find((tab) => tab.active)?.id;
+    // `tabs-ref` owns the active space's tab bar, including creating and
+    // hiding its placeholder. Keep this loop as the fallback for background
+    // pinned spaces and for layouts that do not mount herdr-tab-actions.
+    const tabsRef = mounted(layout(), "tabs-ref");
     for (const p of sp) {
       if (!pinnedIds.has(p.id)) {
+        this.pendingPins.delete(p.id);
+        continue;
+      }
+      if (tabsRef && p.id === activeSpace) {
         this.pendingPins.delete(p.id);
         continue;
       }

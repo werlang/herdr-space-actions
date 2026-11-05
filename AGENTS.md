@@ -6,18 +6,28 @@ Fonte da verdade do plugin de ações de **space** do Herdr:
 - `mods/changes-plus` — clone do painel `changes` que lê o local fixado do space pinado: mostra as mudanças do projeto pinado e o botão Git Graph abre o graph no mesmo projeto, mesmo que um terminal tenha feito `cd` para outro repositório. Acompanha a troca de space na hora, mesmo quando o novo space não tem terminal com foco.
 - `mods/agents-plus` — clone do painel `agents`: clicar numa linha de agent (inclusive sub-agent) seleciona o space do agent antes de mostrar o pane, então o projeto na lista de spaces e os painéis de Changes/Files acompanham.
 - `mods/space-menu` — menu com **Pin space / Unpin space**, **Open in VS Code**, Rename, worktree e Close.
-- `mods/space-pin` — a aba placeholder que mantém um space pinado vivo quando todos os terminais/agents fecham.
+- `mods/space-pin` — a aba placeholder **New tab** que mantém um space pinado vivo quando todos os terminais/agents fecham e oferece atalhos de terminal/agent para o space.
 - `mods/new-menu-plus` — menu do botão `+` que abre terminais e agents no local do space (ou local fixado do pin) em vez do `cwd` do terminal com foco.
 
 ## Comando `newTerminal`
 
-O `spaces-plus` atende `spaces-plus.newTerminal` via `nextCommand()`: abre uma aba de terminal no local fixado do space pinado (ou no `cwd` do terminal com foco, se o space não for pinado). Serve para ligar o `cmd+t` a ele quando o Herdr passaria a usar a pasta de criação do space:
+O `spaces-plus` atende `spaces-plus.newTerminal` via `nextCommand()`: abre uma aba de terminal no local fixado do space pinado (ou no `cwd` do terminal com foco, se o space não for pinado). Serve para ligar o `cmd+t` a ele quando o Herdr passaria a usar a pasta de criação do space, em layouts sem `herdr-tab-actions`:
 
 ```json
 "cmd-t": "spaces-plus.newTerminal"
 ```
 
 Só funciona enquanto o `spaces-plus` estiver montado no layout atual; em layouts sem ele, mantenha `tab.new`.
+
+### New tab e foco
+
+Com `herdr-tab-actions` montado, `cmd+t` deve apontar para `tabs-ref.newTab`: ele abre ou seleciona a aba `New tab` do `space-pin`. O `spaces-plus.newTerminal` continua sendo o atalho para abrir um terminal no local fixado. Sem `tabs-ref`, use `spaces-plus.newTerminal` (ou `tab.new`).
+
+Depois de criar ou selecionar o placeholder, a cópia visível do `space-pin` recebe o foco pelo timer de 50 ms; `T`/Enter abrem um terminal e `1`–`9` abrem o agent. O `focus()` nunca é chamado no `render()`, e cada cópia só age quando `props().space` é o space ativo.
+
+## Limite de publicação
+
+A barra de abas e o comportamento de abas (`cmd+t`/New tab, `cmd+1..9`, `cmd+w` e esconder/mostrar o placeholder) pertencem ao repo `herdr-tab-actions` (`tabs-ref`). Aqui ficam o painel de spaces, o pin e a UI do placeholder `space-pin`. O `ensurePinTabs` do `spaces-plus` é fallback para spaces em segundo plano e para layouts sem `tabs-ref`.
 
 ## Ordenação dos spaces
 

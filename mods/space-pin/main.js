@@ -1,6 +1,7 @@
-// The placeholder pane a pinned space keeps when every terminal/agent closes.
+// The New tab placeholder a pinned space keeps when every terminal/agent closes.
 // It is a normal mod tab (`tab.new { mod: "space-pin" }`), so the space survives
-// an empty tab set. Right-click the space to unpin it.
+// an empty tab set. It also offers terminal/agent shortcuts for that space.
+// Right-click the space to unpin it.
 
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -37,9 +38,18 @@ function place(space) {
 }
 
 export default class SpacePin extends View {
+  /**
+   * True only while THIS copy's own placeholder tab is the one on screen.
+   * Every pinned space keeps its own copy alive (hidden), and all copies share
+   * the same timers: without the `props().space` check each hidden copy would
+   * call `focus()` on its unrendered handle and steal the keyboard back from
+   * the visible one, so the visible placeholder never kept it.
+   */
   isViewVisible() {
     const space = spaces().find((s) => s.active);
     if (!space) return false;
+    const mine = props()?.space;
+    if (mine && mine !== space.id) return false;
     const activeTab = (space.tabs ?? []).find((t) => t.active);
     if (!activeTab) return false;
     const allPanes = panes();
@@ -48,9 +58,6 @@ export default class SpacePin extends View {
 
   init(_props, cx) {
     this.handle = cx.focus_handle();
-    this.handle.focus();
-    cx.timer.after(50, () => this.handle?.focus());
-    cx.timer.after(200, () => this.handle?.focus());
 
     cx.spawn(async (cx) => {
       for (;;) {
@@ -62,7 +69,11 @@ export default class SpacePin extends View {
       }
     });
 
-    cx.timer.every(100, () => {
+    // Focus is only taken here, from a timer (never in render/layout, where
+    // FocusHandle.focus() makes Herdr show "This view could not be re-rendered").
+    // It runs for the visible copy only, so a freshly created or selected
+    // placeholder gets the keyboard within one tick, with no click.
+    cx.timer.every(50, () => {
       if (this.isViewVisible()) {
         const pane = panes().find((p) => p.mod === "space-pin" && p.tab === spaces().find((s) => s.active)?.tabs?.find((t) => t.active)?.id);
         if (pane && !pane.focused) {
@@ -135,7 +146,8 @@ export default class SpacePin extends View {
       .on_mouse_down("left", () => { this.handle?.focus(); })
       .on_key_down((e) => {
         if (e.modifiers.control || e.modifiers.platform || e.modifiers.alt) return;
-        if (e.key === "Enter" || e.key === "t" || e.key === "T") {
+        // GPUI reports named keys in lowercase ("enter"); keep "Enter" for other builds.
+        if (e.key === "enter" || e.key === "Enter" || e.key === "t" || e.key === "T") {
           this.launch();
           return;
         }

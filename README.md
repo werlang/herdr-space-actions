@@ -38,7 +38,7 @@ The choice is stored in `shared("spaces.sort")` and persisted. Sorting is visual
 
 ## Pin behavior
 
-Pinning writes the space id to `shared("spaces.pinned")`, locks its location into `shared("spaces.pinned_locations")`, and adds a **Pinned space** tab backed by `space-pin`. That tab is a placeholder, not a terminal: if every terminal and agent in the space closes, the placeholder tab is still there, so the space remains. The sidebar row shows a pin icon while it is pinned.
+Pinning writes the space id to `shared("spaces.pinned")`, locks its location into `shared("spaces.pinned_locations")`, and adds a **New tab** placeholder backed by `space-pin`. It is not a terminal: it is a small New tab screen with Terminal and installed-agent shortcuts (`T`/Enter, `1`–`9`). If every terminal and agent in the space closes, the placeholder tab is still there, so the space remains. The sidebar row shows a pin icon while it is pinned.
 
 After pinning, the space's location is fixed: running `cd` in terminals inside the space does not change its tracked location, git repo, branch status, or VS Code target folder. Only unpinned spaces follow terminal `cd`.
 
@@ -48,13 +48,16 @@ Opening a new terminal or agent via the UI `+` button (`new-menu-plus`) opens di
 
 ### Where `cmd+t` starts
 
-Herdr's built-in `tab.new` starts a terminal in the space's creation folder. Pinning does not rewrite it. To make `cmd+t` respect pinned locations, bind it to `spaces-plus.newTerminal`:
+Herdr's built-in `tab.new` starts a terminal in the space's creation folder. Pinning does not rewrite it.
+
+- With [`herdr-tab-actions`](https://github.com/werlang/herdr-tab-actions) mounted, bind `cmd+t` to `tabs-ref.newTab`. It opens or selects the **New tab** placeholder, whose menu starts terminals and agents; the tab bar also owns hiding the placeholder while other tabs exist.
+- Without `tabs-ref`, bind `cmd+t` to `spaces-plus.newTerminal`. It starts a terminal in the pinned folder for pinned spaces and keeps Herdr's default for unpinned ones. It works while `spaces-plus` is mounted in the layout.
 
 ```json
-"cmd-t": "spaces-plus.newTerminal"
+"cmd-t": "tabs-ref.newTab"
 ```
 
-It uses the pinned folder for pinned spaces and keeps Herdr's default for unpinned ones. It works while `spaces-plus` is mounted in the layout.
+(or `"cmd-t": "spaces-plus.newTerminal"` when `tabs-ref` is not mounted)
 
 ## Agents and Changes panes
 
