@@ -74,7 +74,7 @@ export default class SpacePin extends View {
     const folder = (space && place(space)) || value.folder;
     const where = space?.machine ?? "";
     const agents = (this.agents && this.agents.length) ? this.agents : (shared(KNOWN)?.[where] ?? []);
-    const installed = agents.filter((a) => a.installed);
+    const installed = agents.filter((a) => a.installed).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
     const count = 1 + installed.length;
     const menuHeight = Math.min(280, 10 + count * 31);
 
