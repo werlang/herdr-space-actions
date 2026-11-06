@@ -9,6 +9,11 @@ import { props, spaces, panes, run, theme, shared, setShared, knownAgents, windo
 
 // The last agents each machine reported, shared with new-menu / new-menu-plus.
 const KNOWN = "new-menu.agents";
+// A timestamp other mods (tabs-ref's cmd+t) bump to ask the visible placeholder
+// for the keyboard again, even when it is already on screen.
+const FOCUS_REQUEST = "space-pin.focus";
+// How long one focus request keeps retrying until the handle is really focused.
+const FOCUS_WINDOW_MS = 400;
 
 function shortcut(name) {
   const k = keys().find((b) => b.section === "global" && (b.action === name || (name === "tab.new" && b.action === "spaces-plus.newTerminal")));
@@ -57,8 +62,36 @@ export default class SpacePin extends View {
   }
 
   /**
-   * Moves the keyboard to this placeholder. Called only from the one-shot
-   * timer above and from an explicit `focus` command, never from render.
+   * Whether a GPUI dialog (`window.open_dialog`) is open. The `window` imported
+   * from "herdr" is the window-info *function* and shadows the GPUI global, so
+   * `window.has_active_dialog` is undefined there and calling it throws (which
+   * killed both the focus timer and the `focus` command loop). Read the global.
+   * Herdr overlays (`openOverlay`) are not GPUI dialogs and are not seen here;
+   * they are handled by the short focus window in `armFocus` instead.
+   * @returns {boolean}
+   */
+  hasDialog() {
+    try {
+      return Boolean(globalThis.window?.has_active_dialog?.());
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Ask for the keyboard for a short window (FOCUS_WINDOW_MS). The timer keeps
+   * retrying until the handle is really focused (the first try can land before
+   * the freshly selected tab is painted, and is then lost), then stops. It never
+   * keeps pulling focus afterwards, so a modal or rename input opened later
+   * keeps its keyboard.
+   */
+  armFocus() {
+    this.focusUntil = Date.now() + FOCUS_WINDOW_MS;
+  }
+
+  /**
+   * Moves the keyboard to this placeholder. Called only from the timer while
+   * armed, never from render.
    */
   takeFocus() {
     const tab = spaces().find((s) => s.active)?.tabs?.find((t) => t.active);
@@ -69,12 +102,18 @@ export default class SpacePin extends View {
 
   init(_props, cx) {
     this.handle = cx.focus_handle();
-    this.focusArmed = true;
+    this.focusUntil = 0;
+    this.wasVisible = false;
+    this.focusRequest = shared(FOCUS_REQUEST);
 
+    // Herdr sends "focus" on pane.go onto this copy and when a popup over it
+    // closes: that is how the keyboard comes back after a modal, without polling.
+    // The view is already painted then, so one take is enough (no retry window:
+    // a popup that closes because it opened a dialog must not fight that dialog).
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command === "focus" && !window.has_active_dialog()) {
+        if (command === "focus" && this.isViewVisible() && !this.hasDialog()) {
           this.takeFocus();
           cx.notify();
         }
@@ -84,18 +123,20 @@ export default class SpacePin extends View {
     // Focus is taken here, from a timer (never in render/layout, where
     // FocusHandle.focus() makes Herdr show "This view could not be re-rendered").
     //
-    // It is taken ONCE each time this copy comes on screen (a created or selected
-    // placeholder gets the keyboard within one tick, with no click), never on a
-    // repeating loop. A loop would pull the keyboard back from any input the user
-    // is typing in (a modal dialog, a rename box) every 50 ms. While a dialog is
-    // open, the take is deferred until it closes.
+    // Focus is only *requested* on events: this copy coming on screen, or a
+    // `shared("space-pin.focus")` stamp from tabs-ref (cmd+t, also when the
+    // placeholder is already selected). Each request opens a short window in
+    // which the timer retries until `is_focused()`; outside it, it does nothing.
     cx.timer.every(50, () => {
-      if (!this.isViewVisible()) {
-        this.focusArmed = true;
-        return;
-      }
-      if (!this.focusArmed || window.has_active_dialog()) return;
-      this.focusArmed = false;
+      const visible = this.isViewVisible();
+      const request = shared(FOCUS_REQUEST);
+      if (visible && (!this.wasVisible || request !== this.focusRequest)) this.armFocus();
+      this.wasVisible = visible;
+      this.focusRequest = request;
+      if (!visible) { this.focusUntil = 0; return; }
+      if (Date.now() > this.focusUntil) return;
+      if (this.hasDialog()) return;
+      if (this.handle?.is_focused()) { this.focusUntil = 0; return; }
       this.takeFocus();
     });
 
