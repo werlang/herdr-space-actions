@@ -1,1 +1,6 @@
-{ "place": "none" }
+{
+  "name": "worktree-plus",
+  "version": "0.1.0",
+  "description": "Dialog for creating, opening, and removing Git worktrees",
+  "place": "none"
+}

@@ -1,4 +1,7 @@
 {
+  "name": "space-menu",
+  "version": "0.1.0",
+  "description": "Space context menu for pinning a space and opening it in VS Code",
   "place": "none",
   "overlay": {
     "width": 240,
