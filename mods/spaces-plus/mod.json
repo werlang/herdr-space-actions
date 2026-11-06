@@ -1,6 +1,9 @@
 {
-  "place": "none",
+  "name": "spaces-plus",
+  "version": "0.1.0",
   "title": "Spaces",
+  "description": "Spaces list with inline Git status, sorting, worktrees, and pinning",
+  "place": "none",
   "cloned_from": {
     "name": "spaces",
     "version": "0.1.12"

@@ -80,6 +80,9 @@ const SORTS = [
   { id: "activity", label: "Last activity", icon: "clock", tip: "Most recent state change first" },
 ];
 const sortOf = () => SORTS.find((s) => s.id === shared("spaces.sort")) ?? SORTS[0];
+// Keep pinned spaces above the rest in every sorted mode. Manual order is left
+// alone: dragging is an explicit order of its own, so the toggle waits for a sort.
+const pinnedFirst = () => shared("spaces.pinned_first") === true;
 
 // What needs you first: a blocked agent, then an idle one (ready for more work),
 // then one that finished while you were away; working or quiet spaces follow.
@@ -418,6 +421,7 @@ export default class Spaces extends View {
 
   sortMenu(t) {
     const on = sortOf().id;
+    const pinFirst = pinnedFirst();
     return v_flex()
       .w_full()
       .p(5)
@@ -440,7 +444,35 @@ export default class Spaces extends View {
         })
         .child(svg(`mods/workspace-chrome/${s.icon}.svg`).size(14).flex_none().text_color(t.muted))
         .child(div().flex_1().child(s.label))
-        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
+        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))))
+      .child(div().h(1).mx(8).my(4).flex_none().bg(t.border))
+      .child(h_flex()
+        .id("space-sort-pinned-first")
+        .h(31)
+        .px(8)
+        .gap(9)
+        .rounded(7)
+        .items_center()
+        .text_color(t.foreground)
+        .hover((el) => el.bg(t.hover))
+        .tooltip("Keep pinned spaces above the rest while a sort is active")
+        .on_click((_e, cx) => {
+          setShared("spaces.pinned_first", !pinFirst);
+          cx.notify();
+        })
+        .child(svg("mods/spaces-plus/pin.svg").size(14).flex_none().text_color(t.muted))
+        .child(div().flex_1().child("Keep pinned spaces first"))
+        .child(div()
+          .size(14)
+          .flex_none()
+          .flex()
+          .items_center()
+          .justify_center()
+          .rounded(3)
+          .border_1()
+          .border_color(pinFirst ? t.accent : t.border)
+          .bg(pinFirst ? t.accent : t.popover)
+          .when(pinFirst, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(10).flex_none().text_color(t.accent_foreground)))));
   }
 
   // Spaces in order, each worktree space moved under its main checkout's. With
@@ -455,10 +487,14 @@ export default class Spaces extends View {
     const mains = new Set(list.filter((r) => r.g && !r.g.linked).map((r) => r.g.repo));
     const nested = (r) => r.g?.linked && mains.has(r.g.repo);
     const sort = sortOf();
+    const pinnedIds = new Set(shared("spaces.pinned") ?? []);
+    const pinFirst = sort.id !== "manual" && pinnedFirst();
     const kidsOf = (r) => (r.g && !r.g.linked ? list.filter((k) => nested(k) && k.g.repo === r.g.repo) : []);
     const key = new Map();
+    const pin = new Map(); // 1 when the row, or a worktree under it, is pinned
     for (const r of list) {
       const kids = kidsOf(r);
+      pin.set(r, pinnedIds.has(r.w.id) || kids.some((k) => pinnedIds.has(k.w.id)) ? 1 : 0);
       if (sort.id === "priority") key.set(r, Math.max(rankOf(r.w), ...kids.map((k) => rankOf(k.w))));
       else if (sort.id === "dirty") key.set(r, changesOf(r.g) + kids.reduce((n, k) => n + changesOf(k.g), 0));
       else if (sort.id === "unpushed") key.set(r, unpushedOf(r.g) + kids.reduce((n, k) => n + unpushedOf(k.g), 0));
@@ -468,6 +504,10 @@ export default class Spaces extends View {
     }
     const cmp = (x, y) => {
       if (sort.id === "manual") return x.i - y.i;
+      if (pinFirst) {
+        const d = pin.get(y) - pin.get(x);
+        if (d) return d;
+      }
       const a = key.get(x), b = key.get(y);
       if (sort.id === "name") return String(a).localeCompare(String(b)) || x.i - y.i;
       return b - a || x.i - y.i;
@@ -707,8 +747,8 @@ export default class Spaces extends View {
         .when(!collapsed, el => el.child("Spaces"))
         .child(h_flex().flex_none().gap(2).items_center()
           .when(!collapsed, el => el.child(div().id("space-sort").size(26).flex_none().flex().items_center().justify_center().rounded(6).text_color(t.dim).hover(s => s.bg(t.hover).text_color(t.foreground))
-            .on_click(() => openOverlay({ mod: "spaces-plus", kind: "popup", width: 240, height: 226, props: { sortMenu: true } }))
-            .tooltip(`Sort spaces: ${sort.label}`)
+            .on_click(() => openOverlay({ mod: "spaces-plus", kind: "popup", width: 240, height: 268, props: { sortMenu: true } }))
+            .tooltip(`Sort spaces: ${sort.label}${pinnedFirst() && sort.id !== "manual" ? " · pinned first" : ""}`)
             .child(svg(`mods/workspace-chrome/${sort.icon}.svg`).size(14))))
           .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
             .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14)))))
