@@ -1,9 +1,9 @@
-// Workspace spaces: stable colored avatars, worktrees under their checkout,
-// grouped by machine when more than one is known. Under a space's name, the repo
-// its first terminal is in now (only where unusual) and the checked-out branch,
-// with colored dots for a dirty worktree and ↑/↓ counts for commits still to
-// push or pull. Agent state lives in the agents list, not here. Click to switch,
-// right-click for its menu, sort from the header, drag to reorder in manual order.
+// Workspace spaces: the git state colors each space name, worktrees under their
+// checkout, grouped by machine when more than one is known. Under a space's
+// name, the repo its first terminal is in now (only where unusual) and the
+// checked-out branch, with ↑/↓ counts for commits still to push or pull. Agent
+// state lives in the agents list, not here. Click to switch, right-click for its
+// menu, sort from the header, drag to reorder in manual order.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -68,10 +68,6 @@ function newTerminalFolder(s, ps) {
 // for this often, in repos the list shows, while the window is in front.
 const FALLBACK = 60000;
 
-// What a stored color name looks like on an avatar (the same in every mod
-// that draws space avatars): one strong color per hue, light and dark alike.
-const MARK = { ansi6: "#22a99a", ansi3: "#e3814f", ansi4: "#5b8def", ansi5: "#8b7cf6", ansi2: "#3fae6a", ansi1: "#d9649a" };
-
 // How the list is ordered. Manual keeps Herdr's own space order (and dragging);
 // every other mode sorts the rows without touching the model, so the order can
 // follow status or git state as it changes and come back to manual untouched.
@@ -91,6 +87,15 @@ const RANK = { blocked: 3, idle: 2, done: 1 };
 const rankOf = (w) => RANK[w.status] ?? 0;
 const changesOf = (g) => (g ? g.conflicts + g.staged + g.unstaged + g.untracked : 0);
 const unpushedOf = (g) => g?.ahead ?? 0;
+// The worktree counts, in the order the old dots used to show them. The name
+// takes one color from these counts (see gitTint); the tooltip lists all of them.
+const GIT_STATES = [
+  { key: "conflicts", one: "conflict", many: "conflicts" },
+  { key: "staged", one: "staged change", many: "staged changes" },
+  { key: "unstaged", one: "modified file", many: "modified files" },
+  { key: "untracked", one: "untracked file", many: "untracked files" },
+];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 // A tab's changed_at is when something in it last changed state; the newest tab
 // is the space's last activity. Tabs with nothing yet stay at 0.
 const activeAt = (w) => Math.max(0, ...(w.tabs ?? []).map((tab) => tab.changed_at ?? 0));
@@ -542,21 +547,33 @@ export default class Spaces extends View {
     return [repo, branch].filter(Boolean).join(" \u00b7 ");
   }
 
-  // What the worktree holds, right of the branch: a colored dot per kind of
-  // change and ↑n/↓n for commits still to push or pull. The dots keep their
-  // counts in a tooltip, so the row stays quiet when everything is clean.
-  gitMarks(g, t) {
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
-    const dot = (n, color, tip) => div().flex_none().size(8).rounded(4).bg(color).tooltip(tip);
+  // The name takes one color, most urgent first: merging conflicts in red,
+  // commits still to push in green (matching ↑n), then any local work — staged,
+  // modified, or untracked — in orange. The tooltip keeps every count.
+  gitTint(g, t) {
+    if (!g) return undefined;
+    if (g.conflicts > 0) return t.ansi1;
+    if (g.ahead > 0) return t.ansi2;
+    if (g.staged + g.unstaged + g.untracked > 0) return t.ansi3;
+    return undefined;
+  }
+
+  gitSummary(g) {
+    if (!g) return undefined;
+    const parts = GIT_STATES
+      .filter((s) => g[s.key] > 0)
+      .map((s) => plural(g[s.key], s.one, s.many));
+    return parts.length ? parts.join(", ") : undefined;
+  }
+
+  // Commits still to push or pull, right of the branch. The dots that used to
+  // sit here now tint the space name instead.
+  gitArrows(g, t) {
     return h_flex()
       .flex_none()
       .gap(4)
       .items_center()
       .text_size(10.5)
-      .when(g.conflicts > 0, (el) => el.child(dot(g.conflicts, t.ansi1, plural(g.conflicts, "conflict", "conflicts"))))
-      .when(g.staged > 0, (el) => el.child(dot(g.staged, t.ansi2, plural(g.staged, "staged change", "staged changes"))))
-      .when(g.unstaged > 0, (el) => el.child(dot(g.unstaged, t.ansi3, plural(g.unstaged, "modified file", "modified files"))))
-      .when(g.untracked > 0, (el) => el.child(dot(g.untracked, t.ansi4, plural(g.untracked, "untracked file", "untracked files"))))
       .when(g.ahead > 0, (el) => el.child(div().flex_none().text_color(t.ansi2).tooltip(plural(g.ahead, "commit to push", "commits to push")).child(`\u2191${g.ahead}`)))
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).tooltip(plural(g.behind, "commit to pull", "commits to pull")).child(`\u2193${g.behind}`)));
   }
@@ -571,15 +588,14 @@ export default class Spaces extends View {
       .items_center()
       .pl(tree ? 44 : 27)
       .child(div().flex_1().min_w(0).truncate().text_size(10.5).text_color(t.dim).tooltip(text).child(text))
-      .child(this.gitMarks(g, t));
+      .child(this.gitArrows(g, t));
   }
 
   row({ w, i, g, tree }, t) {
     const on = w.active;
     const pinned = (shared("spaces.pinned") ?? []).includes(w.id);
-    const colors = shared("space.colors") ?? {};
-    const color = colors[w.id] ?? "ansi6";
-    const fill = color.startsWith("#") ? color : (MARK[color] ?? t[color]);
+    const tint = this.gitTint(g, t) ?? t.foreground;
+    const summary = this.gitSummary(g);
     return v_flex()
       .relative()
       .id(`space-${w.id}`)
@@ -628,8 +644,9 @@ export default class Spaces extends View {
               .gap(9)
               .items_center()
               .when(Boolean(tree), el => el.pl(22).child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(t.dim)))
-              .when(!tree, el => el.child(h_flex().size(18).flex_none().rounded(5).bg(fill).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?")))
-              .child(div().flex_shrink(0).max_w(150).truncate().text_color(t.foreground).child(w.name))
+              .child(div().flex_shrink(0).max_w(150).truncate().text_color(tint)
+                .when(Boolean(summary), el => el.tooltip(summary))
+                .child(w.name))
               .when(pinned, el => el.child(svg("mods/spaces-plus/pin.svg").size(11).flex_none().text_color(t.accent)))
               .when(!g, el => el.child(div().flex_1())),
           )
@@ -663,17 +680,7 @@ export default class Spaces extends View {
       this.pressed = null;
       this.over = null;
     }
-    const palette = ["ansi6", "ansi3", "ansi4", "ansi5", "ansi2", "ansi1"];
     const sp = spaces();
-    const colors = { ...(shared("space.colors") ?? {}) };
-    let changed = false;
-    for (const p of sp) {
-      if (colors[p.id] || p.name === "~") continue;
-      const uses = c => sp.filter(s => colors[s.id] === c).length;
-      colors[p.id] = palette.reduce((best, c) => uses(c) < uses(best) ? c : best);
-      changed = true;
-    }
-    if (changed) setShared("space.colors", colors);
     const pinnedIds = new Set(shared("spaces.pinned") ?? []);
     const pinnedLocs = { ...(shared("spaces.pinned_locations") ?? {}) };
     let locsChanged = false;
