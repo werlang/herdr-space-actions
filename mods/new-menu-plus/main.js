@@ -25,10 +25,14 @@ function shortcut(name) {
   }).join(" ");
 }
 
+// Where a space is now: a pinned space's locked folder, else its first terminal's
+// live folder (so a `cd` in an unpinned space counts), else where it was made.
 function spaceFolder(space) {
   if (!space) return undefined;
   const pinnedLoc = (shared("spaces.pinned_locations") ?? {})[space.id];
-  return pinnedLoc || space.folder || undefined;
+  if (pinnedLoc) return pinnedLoc;
+  const tabs = new Set((space.tabs ?? []).map(tab => tab.id));
+  return panes().find(pane => tabs.has(pane.tab) && pane.cwd)?.cwd || space.folder || undefined;
 }
 
 export default class NewMenuPlus extends View {
@@ -88,7 +92,7 @@ export default class NewMenuPlus extends View {
         .when(this.agents.length === 0, el => el.child(div().px(9).py(6).text_color(t.dim).child(this.failed ? "Could not load agents" : "Checking installed agents…"))))
       .child(div().h(1).mx(4).my(5).bg(t.border))
       .child(this.row("space", div().w(14).child("+"), "New space", () => run("space.new"), shortcut("space.new")))
-      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => openOverlay({ mod: "worktree", kind: "dialog", width: 460, height: 280, props: { space: space?.id, folder: folder || panes().find(p => p.focused)?.cwd, action: "new" } }), "", Boolean(space)))
-      .child(this.row("worktree-open", svg("mods/workspace-chrome/branch.svg").size(14), "Open worktree\u2026", () => openOverlay({ mod: "worktree", kind: "dialog", width: 560, height: 480, props: { space: space?.id, folder: folder || panes().find(p => p.focused)?.cwd, action: "open" } }), "", Boolean(space)));
+      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => openOverlay({ mod: "worktree-plus", kind: "dialog", width: 460, height: 280, props: { space: space?.id, folder, action: "new" } }), "", Boolean(space)))
+      .child(this.row("worktree-open", svg("mods/workspace-chrome/branch.svg").size(14), "Open worktree\u2026", () => openOverlay({ mod: "worktree-plus", kind: "dialog", width: 560, height: 480, props: { space: space?.id, folder, action: "open" } }), "", Boolean(space)));
   }
 }

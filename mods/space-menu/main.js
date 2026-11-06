@@ -121,17 +121,20 @@ function shortcut(name, args) {
 }
 
 function items(space, git, pinned) {
+  // The worktree dialog reads `folder` before anything else: pass the space's
+  // own place (pinned location first) so it never falls back to another repo.
+  const folder = place(space);
   return [
     { label: pinned ? "Unpin space" : "Pin space", command: "space.pin", icon: "pin", hint: pinned ? "pinned" : "" },
     { label: "Open in VS Code", command: "space.vscode", icon: "code" },
     { sep: true },
     { label: "Rename", command: "space.rename", args: { id: space.id }, icon: "rename" },
     ...(git ? [
-      { label: "New worktree", command: "worktree", args: { space: space.id, action: "new" }, icon: "worktree" },
-      { label: "Open worktree", command: "worktree", args: { space: space.id, action: "open" }, icon: "worktree" },
+      { label: "New worktree", command: "worktree", args: { space: space.id, folder, action: "new" }, icon: "worktree" },
+      { label: "Open worktree", command: "worktree", args: { space: space.id, folder, action: "open" }, icon: "worktree" },
     ] : []),
     ...(git === "linked" ? [
-      { label: "Remove worktree", command: "worktree", args: { space: space.id, action: "remove" }, icon: "worktree" },
+      { label: "Remove worktree", command: "worktree", args: { space: space.id, folder, action: "remove" }, icon: "worktree" },
     ] : []),
     { sep: true },
     { label: "Close", command: "space.close", args: { id: space.id }, icon: "close" },
@@ -198,7 +201,7 @@ export default class SpaceMenu extends View {
     closeOverlay(props()?.overlay);
     if (item.command === "worktree") {
       openOverlay({
-        mod: "worktree",
+        mod: "worktree-plus",
         kind: "dialog",
         ...(item.args.action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }),
         props: item.args,

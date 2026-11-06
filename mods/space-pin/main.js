@@ -56,33 +56,47 @@ export default class SpacePin extends View {
     return allPanes.some((pane) => pane.tab === activeTab.id && pane.mod === "space-pin");
   }
 
+  /**
+   * Moves the keyboard to this placeholder. Called only from the one-shot
+   * timer above and from an explicit `focus` command, never from render.
+   */
+  takeFocus() {
+    const tab = spaces().find((s) => s.active)?.tabs?.find((t) => t.active);
+    const pane = panes().find((p) => p.mod === "space-pin" && p.tab === tab?.id);
+    if (pane && !pane.focused) run("pane.focus", { pane: pane.pane });
+    this.handle?.focus();
+  }
+
   init(_props, cx) {
     this.handle = cx.focus_handle();
+    this.focusArmed = true;
 
     cx.spawn(async (cx) => {
       for (;;) {
         const command = await nextCommand();
-        if (command === "focus") {
-          this.handle.focus();
+        if (command === "focus" && !window.has_active_dialog()) {
+          this.takeFocus();
           cx.notify();
         }
       }
     });
 
-    // Focus is only taken here, from a timer (never in render/layout, where
+    // Focus is taken here, from a timer (never in render/layout, where
     // FocusHandle.focus() makes Herdr show "This view could not be re-rendered").
-    // It runs for the visible copy only, so a freshly created or selected
-    // placeholder gets the keyboard within one tick, with no click.
+    //
+    // It is taken ONCE each time this copy comes on screen (a created or selected
+    // placeholder gets the keyboard within one tick, with no click), never on a
+    // repeating loop. A loop would pull the keyboard back from any input the user
+    // is typing in (a modal dialog, a rename box) every 50 ms. While a dialog is
+    // open, the take is deferred until it closes.
     cx.timer.every(50, () => {
-      if (this.isViewVisible()) {
-        const pane = panes().find((p) => p.mod === "space-pin" && p.tab === spaces().find((s) => s.active)?.tabs?.find((t) => t.active)?.id);
-        if (pane && !pane.focused) {
-          run("pane.focus", { pane: pane.pane });
-        }
-        if (!this.handle?.is_focused()) {
-          this.handle?.focus();
-        }
+      if (!this.isViewVisible()) {
+        this.focusArmed = true;
+        return;
       }
+      if (!this.focusArmed || window.has_active_dialog()) return;
+      this.focusArmed = false;
+      this.takeFocus();
     });
 
     const space = spaces().find((s) => s.id === props()?.space) ?? spaces().find((s) => s.active);
