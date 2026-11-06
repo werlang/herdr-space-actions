@@ -41,6 +41,8 @@ O cabeçalho do `spaces-plus` tem um botão de ordenação que abre um popup com
 - **Unpushed commits** — mais commits para push primeiro;
 - **Last activity** — mudança de estado mais recente primeiro.
 
+Abaixo dos modos, o toggle **Keep pinned spaces first** mantém os spaces pinados no topo de qualquer modo de ordenação. Fica em `shared("spaces.pinned_first")` e não afeta a ordem manual, onde o arrastar continua mandando. Uma linha de repositório também conta como pinada quando uma de suas worktrees está pinada.
+
 O modo escolhido fica em `shared("spaces.sort")`. A ordenação é só visual: não chama `space.move`, então `cmd+1..9`, `space.next` e `space.prev` continuam na ordem do modelo. Worktrees continuam aninhadas sob o checkout principal; a linha principal usa o agregado das worktrees (prioridade máxima, soma de mudanças/commits, atividade mais recente), então uma worktree urgente sobe junto com o repo. O arrastar para reordenar aparece só no modo manual.
 
 ## Regra: sempre atualizar a pasta live do Herdr

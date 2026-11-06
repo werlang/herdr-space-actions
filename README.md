@@ -34,6 +34,8 @@ The **Spaces** header has a sort button that opens a popup with:
 - **Unpushed commits** — the most commits still to push first.
 - **Last activity** — the most recent state change first.
 
+Below the modes, **Keep pinned spaces first** keeps pinned spaces at the top of any sorted mode. It is stored in `shared("spaces.pinned_first")` and has no effect on manual order, where dragging stays in charge. A repository row also counts as pinned when one of its worktrees is pinned.
+
 The choice is stored in `shared("spaces.sort")` and persisted. Sorting is visual: it never calls `space.move`, so `cmd+1..9`, `space.next`, and `space.prev` keep following Herdr's model order. Worktrees stay nested under their main checkout; the main row aggregates worktree numbers so an urgent worktree lifts its whole repository into view.
 
 ## Pin behavior

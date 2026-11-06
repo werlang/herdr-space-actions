@@ -18,7 +18,7 @@ The spaces sidebar gains a small pin icon on pinned rows. Right-clicking a space
 
 The menu is keyboard-navigable: ↑/↓ move, Enter runs, Esc closes.
 
-The spaces header has a sort button: **Manual order** (drag to reorder), **Alphabetical**, **Priority** (blocked, idle, done, then others), **Uncommitted changes**, **Unpushed commits**, and **Last activity**. The mode is stored in `shared("spaces.sort")`; sorting is visual and does not reorder Herdr's model.
+The spaces header has a sort button: **Manual order** (drag to reorder), **Alphabetical**, **Priority** (blocked, idle, done, then others), **Uncommitted changes**, **Unpushed commits**, and **Last activity**. The mode is stored in `shared("spaces.sort")`; sorting is visual and does not reorder Herdr's model. A **Keep pinned spaces first** toggle below the modes floats pinned spaces above the rest in every sorted mode (not manual order) and is stored in `shared("spaces.pinned_first")`.
 
 Each space in a Git repo shows a secondary line with the branch name and push/pull counters (`↑`/`↓`); the space name is red for merge conflicts, green for commits still to push (matching `↑n`), and orange for staged, modified, or untracked files, with the counts in its tooltip.
 
@@ -60,7 +60,7 @@ Each space in a Git repo shows a secondary line with the branch name and push/pu
 
 - `herdr-app check` passes for all 6 mods.
 - Right-clicking a space shows Pin/Unpin and Open in VS Code, plus the existing items.
-- The spaces header sort menu offers Manual order, Alphabetical, Priority, Uncommitted changes, Unpushed commits, and Last activity.
+- The spaces header sort menu offers Manual order, Alphabetical, Priority, Uncommitted changes, Unpushed commits, and Last activity, plus a Keep pinned spaces first toggle for the sorted modes.
 - Pinning adds the New tab placeholder and the row pin icon; closing all terminals/agents leaves the space.
 - Unpinning removes the placeholder; if the space is empty it closes normally.
 - Open in VS Code opens the right folder.
