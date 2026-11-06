@@ -20,7 +20,7 @@ The menu is keyboard-navigable: ↑/↓ move, Enter runs, Esc closes.
 
 The spaces header has a sort button: **Manual order** (drag to reorder), **Alphabetical**, **Priority** (blocked, idle, done, then others), **Uncommitted changes**, **Unpushed commits**, and **Last activity**. The mode is stored in `shared("spaces.sort")`; sorting is visual and does not reorder Herdr's model.
 
-Each space in a Git repo shows a secondary line with the branch name, colored dots for uncommitted changes (conflicts, staged, modified, untracked), and push/pull counters (`↑`/`↓`).
+Each space in a Git repo shows a secondary line with the branch name and push/pull counters (`↑`/`↓`); the space name is red for merge conflicts, green for commits still to push (matching `↑n`), and orange for staged, modified, or untracked files, with the counts in its tooltip.
 
 ## How it behaves
 

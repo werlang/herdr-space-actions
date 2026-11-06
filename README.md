@@ -5,7 +5,7 @@ Right-click a **space** in Herdr's sidebar for extra actions and turn your space
 - **Pin space / Unpin space** — the space stays even when every terminal and agent in it is closed, backed by a lightweight placeholder tab (`space-pin`).
 - **Open in VS Code** — opens the space's current folder in VS Code (supports local projects and remote SSH machines).
 - **Fixed project locations** — running `cd` inside terminals does not change the space's project directory or git status.
-- **Git status inline** — view branch name, dirty worktree status dots (conflicts, staged, modified, untracked), and push/pull commit arrows directly under each space row.
+- **Git status inline** — view branch name, a status color on the space name (merge conflicts, unpushed commits, local changes), and push/pull commit arrows directly under each space row.
 - **Smart sorting** — sort spaces by manual order, alphabetical, priority (blocked/idle/done agents), uncommitted changes, unpushed commits, or last activity.
 - **Context synchronization** — clicking an agent in `agents-plus` automatically selects that agent's space; `changes-plus` keeps diffs focused on the space repo; `new-menu-plus` launches new terminals and agents directly in the space root.
 
@@ -18,10 +18,10 @@ The menu preserves existing space capabilities: Rename, New worktree / Open work
 Each space that lives in a git repository grows a second, smaller line under its name:
 
 - the checked-out branch, prefixed by the repository name when the space name does not already say it (main and master stay visible);
-- colored dots for a dirty worktree: red for conflicts, green for staged changes, orange for modified files, blue for untracked files (hover a dot to see the count);
+- the space name tinted by git state: red for a merge with conflicts, green for commits still to push (matching the `↑n` arrow), orange for staged, modified, or untracked files (hover the name to see every count);
 - green `↑n` for commits still to push and red `↓n` for commits still to pull.
 
-Clean rows show no dots and no arrows. Non-repository spaces keep the compact single-line row.
+Clean rows show no tint and no arrows. Non-repository spaces keep the compact single-line row.
 
 ## Sorting the spaces list
 
@@ -135,7 +135,7 @@ Source of truth for the mods. After edits:
 
 This repo is an app-mod repo. To share it on `herdr.dev/mods`:
 
-- keep `mods/spaces-plus`, `mods/changes-plus`, `mods/space-menu`, `mods/space-pin`, `mods/new-menu-plus`, and `mods/agents-plus` at the root;
+- keep `mods/spaces-plus`, `mods/changes-plus`, `mods/space-menu`, `mods/space-pin`, `mods/new-menu-plus`, `mods/agents-plus`, and `mods/worktree-plus` at the root;
 - keep `RECIPE.md` and `preview.png`;
 - add the topic `herdr-mod`;
 - make the repository public.
