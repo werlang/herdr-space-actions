@@ -1,8 +1,8 @@
 {
   "name": "space-pin",
-  "version": "0.1.0",
-  "title": "New tab",
-  "description": "Placeholder tab that keeps a pinned space alive and starts terminals or agents",
+  "version": "0.1.1",
+  "title": "Space Pin",
+  "description": "New tab placeholder that keeps a pinned space open and starts terminals or agents",
   "place": "none",
   "focusable": true
 }

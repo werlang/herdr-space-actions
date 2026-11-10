@@ -1,7 +1,7 @@
 {
   "name": "agents-plus",
-  "version": "0.1.0",
-  "title": "Agents",
+  "version": "0.1.1",
+  "title": "Agents Plus",
   "description": "Agents panel that selects an agent's space and follows its sub-agents",
   "place": "none",
   "cloned_from": {

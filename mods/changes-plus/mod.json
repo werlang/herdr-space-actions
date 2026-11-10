@@ -1,6 +1,7 @@
 {
   "name": "changes-plus",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "title": "Changes Plus",
   "description": "Changes panel that follows the space's project folder",
   "place": "none"
 }

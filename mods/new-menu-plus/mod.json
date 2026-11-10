@@ -1,6 +1,7 @@
 {
   "name": "new-menu-plus",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "title": "New Menu Plus",
   "description": "New tab menu that starts terminals and agents in the space's folder",
   "place": "none",
   "overlay": {
