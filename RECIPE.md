@@ -1,6 +1,6 @@
 # Space Actions & Persistent Workspaces
 
-Right-click a **space** in Herdr's sidebar for **Pin space** and **Open in VS Code**, alongside the usual rename/worktree/close items. View git branch and dirty worktree status directly in the spaces list, and sort spaces intelligently.
+Right-click a **space** in Herdr's sidebar for **Pin space**, **Open in VS Code** and **Open in Finder/Explorer**, alongside the usual rename/worktree/close items. View git branch and dirty worktree status directly in the spaces list, and sort spaces intelligently.
 
 ![Space Actions](preview.png)
 
@@ -10,6 +10,7 @@ The spaces sidebar gains a small pin icon on pinned rows. Right-clicking a space
 
 - **Pin space** / **Unpin space** — pinned rows show the pin icon.
 - **Open in VS Code** — opens the space's folder in a new VS Code window.
+- **Open in Finder** / **Open in Explorer** / **Open in File Manager** — reveals the space's folder in the system file manager (hidden for remote spaces).
 - separator
 - **Rename**
 - **New worktree** / **Open worktree** (and **Remove worktree** for a linked worktree)
@@ -35,6 +36,7 @@ Each space in a Git repo shows a secondary line with the branch name and push/pu
 - Unpinning closes the placeholder tab and unlocks its location to follow terminal `cd` again. If it was the only tab, the space closes normally.
 - **Close** still closes the space explicitly; the pin protects against an empty space, not against Close.
 - **Open in VS Code** runs `code -n <folder>` locally. For a remote space it runs `code --remote ssh-remote+<target> -n <folder>`, resolving the SSH target from `hc machine ls --json`.
+- **Open in Finder** (macOS), **Open in Explorer** (Windows) or **Open in File Manager** (Linux) runs `open`, `explorer` or `xdg-open` on the same folder. Remote spaces hide the item because their folder is not local.
 - For pinned spaces, the folder is the fixed pinned location. For unpinned spaces, the folder is the first live terminal's current folder, else the space's creation folder.
 
 ## Built from
@@ -65,9 +67,10 @@ Each space in a Git repo shows a secondary line with the branch name and push/pu
 ## Done when
 
 - `herdr-app check` passes for all 6 mods.
-- Right-clicking a space shows Pin/Unpin and Open in VS Code, plus the existing items.
+- Right-clicking a space shows Pin/Unpin, Open in VS Code, and Open in Finder/Explorer, plus the existing items.
 - The spaces header sort menu offers Manual order, Alphabetical, Priority, Uncommitted changes, Unpushed commits, and Last activity, plus a Keep pinned spaces first toggle for the sorted modes.
 - Pinning adds the New tab placeholder and the row pin icon; closing all terminals/agents leaves the space.
 - Unpinning removes the placeholder; if the space is empty it closes normally.
 - Open in VS Code opens the right folder.
+- Open in Finder/Explorer opens the right folder in the system file manager.
 - `herdr-app status` reports no errors.

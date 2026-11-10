@@ -4,6 +4,7 @@ Right-click a **space** in Herdr's sidebar for extra actions and turn your space
 
 - **Pin space / Unpin space** — the space stays even when every terminal and agent in it is closed, backed by a lightweight placeholder tab (`space-pin`).
 - **Open in VS Code** — opens the space's current folder in VS Code (supports local projects and remote SSH machines).
+- **Open in Finder / Explorer / File Manager** — reveals the space's current folder in the system file manager (macOS, Windows, or Linux).
 - **Fixed project locations** — running `cd` inside terminals does not change the space's project directory or git status.
 - **Git status inline** — view branch name, a status color on the space name (merge conflicts, unpushed commits, local changes), and push/pull commit arrows directly under each space row.
 - **Smart sorting** — sort spaces by manual order, alphabetical, priority (blocked/idle/done agents), uncommitted changes, unpushed commits, or last activity.
@@ -72,6 +73,16 @@ Herdr's built-in `tab.new` starts a terminal in the space's creation folder. Pin
 - Remote space: `code --remote ssh-remote+<target> -n <folder>`, where `<target>` comes from `hc machine ls --json`.
 
 For pinned spaces, the folder is the fixed pinned location. For unpinned spaces, the folder is the first live terminal's current folder, else the space's creation folder.
+
+## Open in Finder / Explorer
+
+The action follows the host system:
+
+- macOS: `open <folder>` (Finder).
+- Windows: `explorer <folder>` (File Explorer).
+- Linux: `xdg-open <folder>` (default file manager).
+
+It is hidden for remote spaces, since their folder lives on another machine. The same folder rules as **Open in VS Code** apply (pinned location first).
 
 ## Each mod works alone
 

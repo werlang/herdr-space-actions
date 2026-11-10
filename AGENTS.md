@@ -5,7 +5,7 @@ Fonte da verdade do plugin de ações de **space** do Herdr:
 - `mods/spaces-plus` — clone do `spaces` que abre o `space-menu` no right-click, mostra o ícone de pin, mostra sob cada space o branch, a cor de merge/commits não enviados/mudanças locais no nome do space e as setas de commits para push/pull, e ordena a lista pelo botão do cabeçalho (alfabética, prioridade, mudanças não commitadas, commits não enviados ou última atividade).
 - `mods/changes-plus` — clone do painel `changes` que lê o local fixado do space pinado: mostra as mudanças do projeto pinado e o botão Git Graph abre o graph no mesmo projeto, mesmo que um terminal tenha feito `cd` para outro repositório. Acompanha a troca de space na hora, mesmo quando o novo space não tem terminal com foco.
 - `mods/agents-plus` — clone do painel `agents`: clicar numa linha de agent (inclusive sub-agent) seleciona o space do agent antes de mostrar o pane, então o projeto na lista de spaces e os painéis de Changes/Files acompanham.
-- `mods/space-menu` — menu com **Pin space / Unpin space**, **Open in VS Code**, Rename, worktree e Close.
+- `mods/space-menu` — menu com **Pin space / Unpin space**, **Open in VS Code**, **Open in Finder/Explorer** (conforme o sistema), Rename, worktree e Close.
 - `mods/space-pin` — a aba placeholder **New tab** que mantém um space pinado vivo quando todos os terminais/agents fecham e oferece atalhos de terminal/agent para o space.
 - `mods/new-menu-plus` — menu do botão `+` que abre terminais e agents no local do space (ou local fixado do pin) em vez do `cwd` do terminal com foco.
 - `mods/worktree-plus` — clone do diálogo `worktree` com o visual dos modais do plugin (New, Open e Remove worktree); abre no local do space.
