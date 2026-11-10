@@ -1,8 +1,8 @@
 {
   "name": "space-menu",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "title": "Space Menu",
-  "description": "Space right-click menu with Pin space and Open in VS Code",
+  "description": "Space right-click menu with Pin space, Open in VS Code and Open in Finder/Explorer",
   "place": "none",
   "overlay": {
     "width": 240,

@@ -29,7 +29,7 @@ function mounted(node, mod) {
 /**
  * Optional mods this list works with; none is required.
  * - space-pin: the placeholder tab that keeps a pinned space alive.
- * - space-menu: the right-click menu with Pin space and Open in VS Code
+ * - space-menu: the right-click menu with Pin space, Open in VS Code and Open in Finder/Explorer
  *   (otherwise Herdr's own `menu`).
  */
 const OPTIONAL_MODS = ["space-pin", "space-menu"];

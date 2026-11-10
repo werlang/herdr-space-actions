@@ -1,5 +1,5 @@
-// Space context menu: pin/unpin a space and open its folder in VS Code,
-// alongside Herdr's rename/worktree/close items.
+// Space context menu: pin/unpin a space and open its folder in VS Code or the
+// system file manager, alongside Herdr's rename/worktree/close items.
 //
 // Opened by `spaces-plus` with props { space: "<space id>" }.
 //
@@ -9,7 +9,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, spaces, panes, exec, hc, notify, shared, setShared, appHome, readTextFile } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, keys, spaces, panes, exec, hc, notify, shared, setShared, appHome, readTextFile, window } from "herdr";
 
 // Where a space is now: pinned spaces keep their pinned location,
 // while unpinned spaces follow their first terminal's live folder (else where made).
@@ -118,9 +118,39 @@ async function openVSCode(space) {
   }
 }
 
+// The system file manager's label and the command that opens a folder in it.
+const FILE_MANAGERS = {
+  macos: { label: "Open in Finder", command: "open" },
+  windows: { label: "Open in Explorer", command: "explorer" },
+  linux: { label: "Open in File Manager", command: "xdg-open" },
+};
+
+function fileManager() {
+  return FILE_MANAGERS[window()?.platform] ?? { label: "Open folder", command: "open" };
+}
+
+async function openFolder(space) {
+  const folder = place(space);
+  const { label, command } = fileManager();
+  if (!folder) {
+    notify({ title: label, body: "This space has no folder.", level: "warning" });
+    return;
+  }
+  try {
+    const result = await exec(command, [folder]);
+    // explorer.exe exits 1 even when it opens the folder.
+    if (result.code !== 0 && command !== "explorer") {
+      notify({ title: label, body: (result.stderr || "").trim() || `exit ${result.code}`, level: "error" });
+    }
+  } catch {
+    notify({ title: label, body: `Could not open ${folder}.`, level: "error" });
+  }
+}
+
 function iconFor(item) {
   if (item.icon === "pin") return "mods/space-menu/pin.svg";
   if (item.icon === "code") return "mods/space-menu/vscode.svg";
+  if (item.icon === "folder") return "mods/workspace-chrome/folder.svg";
   if (item.icon === "rename") return "mods/workspace-chrome/square-pen.svg";
   if (item.icon === "worktree") return "mods/workspace-chrome/git-branch.svg";
   if (item.icon === "close") return "mods/workspace-chrome/x.svg";
@@ -140,6 +170,9 @@ function items(space, git, pinned, canPin = true) {
   return [
     ...(pinned || canPin ? [{ label: pinned ? "Unpin space" : "Pin space", command: "space.pin", icon: "pin", hint: pinned ? "pinned" : "" }] : []),
     { label: "Open in VS Code", command: "space.vscode", icon: "code" },
+    // A remote space's folder lives on another machine: there is nothing local
+    // for Finder/Explorer to show.
+    ...(space.machine ? [] : [{ label: fileManager().label, command: "space.folder", icon: "folder" }]),
     { sep: true },
     { label: "Rename", command: "space.rename", args: { id: space.id }, icon: "rename" },
     ...(git ? [
@@ -216,6 +249,11 @@ export default class SpaceMenu extends View {
     if (item.command === "space.vscode") {
       closeOverlay(props()?.overlay);
       openVSCode(space);
+      return;
+    }
+    if (item.command === "space.folder") {
+      closeOverlay(props()?.overlay);
+      openFolder(space);
       return;
     }
     closeOverlay(props()?.overlay);
