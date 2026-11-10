@@ -3,7 +3,16 @@
 
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { theme, spaces, panes, knownAgents, run, openOverlay, closeOverlay, props, window, keys, shared, setShared } from "herdr";
+import { theme, spaces, panes, knownAgents, run, openOverlay, closeOverlay, props, window, keys, shared, setShared, appHome, readTextFile } from "herdr";
+
+/**
+ * The worktree dialog: `worktree-plus` when installed, else Herdr's own
+ * `worktree` (same props). Read once per menu; the popup is short-lived.
+ * @returns {Promise<string>}
+ */
+const worktreeMod = () => readTextFile(`${appHome()}/mods/worktree-plus/mod.json`)
+  .then((text) => (typeof text === "string" ? "worktree-plus" : "worktree"))
+  .catch(() => "worktree");
 
 // The last agents each machine reported, shown at once while knownAgents() checks again.
 const KNOWN = "new-menu.agents";
@@ -40,6 +49,8 @@ export default class NewMenuPlus extends View {
     const machine = spaces().find(s => s.active)?.machine;
     const where = machine ?? "";
     this.agents = shared(KNOWN)?.[where] ?? [];
+    this.worktree = "worktree";
+    cx.spawn(async () => { this.worktree = await worktreeMod(); });
     this.handle = cx.focus_handle();
     this.handle.focus();
     if (props()?.overlay) setShared("new-menu.open", props().overlay);
@@ -92,7 +103,7 @@ export default class NewMenuPlus extends View {
         .when(this.agents.length === 0, el => el.child(div().px(9).py(6).text_color(t.dim).child(this.failed ? "Could not load agents" : "Checking installed agents…"))))
       .child(div().h(1).mx(4).my(5).bg(t.border))
       .child(this.row("space", div().w(14).child("+"), "New space", () => run("space.new"), shortcut("space.new")))
-      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => openOverlay({ mod: "worktree-plus", kind: "dialog", width: 460, height: 280, props: { space: space?.id, folder, action: "new" } }), "", Boolean(space)))
-      .child(this.row("worktree-open", svg("mods/workspace-chrome/branch.svg").size(14), "Open worktree\u2026", () => openOverlay({ mod: "worktree-plus", kind: "dialog", width: 560, height: 480, props: { space: space?.id, folder, action: "open" } }), "", Boolean(space)));
+      .child(this.row("worktree", svg("mods/workspace-chrome/branch.svg").size(14), "New worktree…", () => openOverlay({ mod: this.worktree, kind: "dialog", width: 460, height: 280, props: { space: space?.id, folder, action: "new" } }), "", Boolean(space)))
+      .child(this.row("worktree-open", svg("mods/workspace-chrome/branch.svg").size(14), "Open worktree\u2026", () => openOverlay({ mod: this.worktree, kind: "dialog", width: 560, height: 480, props: { space: space?.id, folder, action: "open" } }), "", Boolean(space)));
   }
 }
