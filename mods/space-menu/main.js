@@ -2,10 +2,14 @@
 // alongside Herdr's rename/worktree/close items.
 //
 // Opened by `spaces-plus` with props { space: "<space id>" }.
+//
+// Works on its own: Pin space needs the `space-pin` placeholder mod (shown
+// only while it is installed, or to unpin), and the worktree items open
+// `worktree-plus` when installed, else Herdr's own `worktree` dialog.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { run, props, closeOverlay, openOverlay, theme, keys, spaces, panes, exec, hc, notify, shared, setShared } from "herdr";
+import { run, props, closeOverlay, openOverlay, theme, keys, spaces, panes, exec, hc, notify, shared, setShared, appHome, readTextFile } from "herdr";
 
 // Where a space is now: pinned spaces keep their pinned location,
 // while unpinned spaces follow their first terminal's live folder (else where made).
@@ -27,6 +31,15 @@ async function checkout(folder, on) {
   return common.stdout.trim() === `${top.stdout.trim()}/.git` ? "main" : "linked";
 }
 
+/**
+ * Whether a mod is installed in the live mods folder (its manifest exists).
+ * @param {string} name mod folder name
+ * @returns {Promise<boolean>}
+ */
+function installed(name) {
+  return readTextFile(`${appHome()}/mods/${name}/mod.json`).then((text) => typeof text === "string").catch(() => false);
+}
+
 function hasPinTab(space) {
   const tabs = new Set((space.tabs ?? []).map((tab) => tab.id));
   return panes().some((pane) => pane.mod === "space-pin" && tabs.has(pane.tab));
@@ -34,7 +47,7 @@ function hasPinTab(space) {
 
 // A pinned space keeps a `space-pin` tab so closing every terminal/agent does
 // not take the space with it. Unpinning closes those placeholder tabs.
-function togglePin(space) {
+function togglePin(space, placeholder = true) {
   const ids = new Set(shared("spaces.pinned") ?? []);
   const locs = { ...(shared("spaces.pinned_locations") ?? {}) };
   const autoNamed = new Set(shared("spaces.pinned_auto_named") ?? []);
@@ -66,7 +79,7 @@ function togglePin(space) {
   setShared("spaces.pinned", [...ids]);
   setShared("spaces.pinned_locations", locs);
   setShared("spaces.pinned_auto_named", [...autoNamed]);
-  if (!hasPinTab(space)) {
+  if (placeholder && !hasPinTab(space)) {
     const activeSpace = spaces().find((candidate) => candidate.active)?.id;
     const activeTab = (space.tabs ?? []).find((tab) => tab.active)?.id;
     run("tab.new", { space: space.id, mod: "space-pin", name: "New tab", props: { space: space.id, folder: loc } });
@@ -120,12 +133,12 @@ function shortcut(name, args) {
   return binding ? binding.keys : "";
 }
 
-function items(space, git, pinned) {
+function items(space, git, pinned, canPin = true) {
   // The worktree dialog reads `folder` before anything else: pass the space's
   // own place (pinned location first) so it never falls back to another repo.
   const folder = place(space);
   return [
-    { label: pinned ? "Unpin space" : "Pin space", command: "space.pin", icon: "pin", hint: pinned ? "pinned" : "" },
+    ...(pinned || canPin ? [{ label: pinned ? "Unpin space" : "Pin space", command: "space.pin", icon: "pin", hint: pinned ? "pinned" : "" }] : []),
     { label: "Open in VS Code", command: "space.vscode", icon: "code" },
     { sep: true },
     { label: "Rename", command: "space.rename", args: { id: space.id }, icon: "rename" },
@@ -145,6 +158,13 @@ export default class SpaceMenu extends View {
   init(_props, cx) {
     this.at = 0;
     this.git = null;
+    /** @type {Record<string, boolean>} optional mods: space-pin, worktree-plus */
+    this.mods = {};
+    cx.spawn(async (cx) => {
+      const [pin, worktree] = await Promise.all([installed("space-pin"), installed("worktree-plus")]);
+      this.mods = { "space-pin": pin, "worktree-plus": worktree };
+      cx.notify();
+    });
     this.handle = cx.focus_handle();
     this.handle.focus();
     const space = this.space();
@@ -166,7 +186,7 @@ export default class SpaceMenu extends View {
     const space = this.space();
     if (!space) return [];
     const pinned = (shared("spaces.pinned") ?? []).includes(space.id);
-    return items(space, this.git, pinned);
+    return items(space, this.git, pinned, Boolean(this.mods["space-pin"]));
   }
 
   move(delta) {
@@ -189,7 +209,7 @@ export default class SpaceMenu extends View {
       return;
     }
     if (item.command === "space.pin") {
-      togglePin(space);
+      togglePin(space, Boolean(this.mods["space-pin"]));
       closeOverlay(props()?.overlay);
       return;
     }
@@ -201,7 +221,7 @@ export default class SpaceMenu extends View {
     closeOverlay(props()?.overlay);
     if (item.command === "worktree") {
       openOverlay({
-        mod: "worktree-plus",
+        mod: this.mods["worktree-plus"] ? "worktree-plus" : "worktree",
         kind: "dialog",
         ...(item.args.action === "open" ? { width: 560, height: 480 } : { width: 440, height: 260 }),
         props: item.args,
