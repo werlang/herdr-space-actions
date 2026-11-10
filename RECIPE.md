@@ -50,6 +50,12 @@ Each space in a Git repo shows a secondary line with the branch name and push/pu
 
 ## Watch out
 
+- **Each mod works alone.** The seven mods are designed together, but none needs another, and none needs a mod from another repo. Optional mods are looked for in the live `mods/` folder (every few seconds for panels, once per popup), so installing or turning one off applies live:
+  - `spaces-plus` without `space-menu`: right-click opens Herdr's own `menu`. Without `space-pin`: pinned spaces keep their folder and sort order but get no placeholder.
+  - `space-menu` without `space-pin`: **Pin space** is hidden (**Unpin space** still shows for a space pinned earlier). Without `worktree-plus`: the worktree items open Herdr's own `worktree` dialog.
+  - `new-menu-plus` without `worktree-plus`: same fallback to Herdr's `worktree` dialog.
+  - `changes-plus` without `git-graph` (`herdr-git-graph`): the Git Graph button is hidden.
+  - `agents-plus`, `space-pin` and `worktree-plus` use no other custom mod.
 - The pinned placeholder is a real tab named **New tab**. If using the companion mod [`herdr-tab-actions`](https://github.com/werlang/herdr-tab-actions) (`tabs-ref`), it is hidden automatically while other tabs exist; otherwise, it stays visible as a tab.
 - Tab-bar behavior (`cmd+t`/New tab, `cmd+1..9`, `cmd+w`, hiding the placeholder) belongs to `herdr-tab-actions`. This repo owns the placeholder UI and the pinned-folder launch.
 - If the user closes the placeholder tab itself and no other tabs remain, the space closes.

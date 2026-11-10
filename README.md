@@ -73,6 +73,20 @@ Herdr's built-in `tab.new` starts a terminal in the space's creation folder. Pin
 
 For pinned spaces, the folder is the fixed pinned location. For unpinned spaces, the folder is the first live terminal's current folder, else the space's creation folder.
 
+## Each mod works alone
+
+Install all seven for the full feature, or only the ones you want: no mod here needs another, or a mod from another repo.
+
+| Mod | Without its optional companion |
+|---|---|
+| `spaces-plus` | no `space-menu`: right-click opens Herdr's own menu · no `space-pin`: pinned spaces keep their folder and order, but no placeholder tab |
+| `space-menu` | no `space-pin`: **Pin space** is hidden (Unpin still shows for spaces pinned earlier) · no `worktree-plus`: Herdr's own worktree dialog |
+| `new-menu-plus` | no `worktree-plus`: Herdr's own worktree dialog |
+| `changes-plus` | no [`git-graph`](https://github.com/werlang/herdr-git-graph): the Git Graph button is hidden |
+| `agents-plus`, `space-pin`, `worktree-plus` | standalone |
+
+Optional mods are detected from `~/.config/herdr-app/mods/`, so installing or turning one off applies live.
+
 ## Requirements
 
 - Herdr app.

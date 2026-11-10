@@ -26,6 +26,17 @@ Com `herdr-tab-actions` montado, `cmd+t` deve apontar para `tabs-ref.newTab`: el
 
 Depois de criar ou selecionar o placeholder, a cópia visível do `space-pin` recebe o foco pelo timer de 50 ms; `T`/Enter abrem um terminal e `1`–`9` abrem o agent. O `focus()` nunca é chamado no `render()`, e cada cópia só age quando `props().space` é o space ativo.
 
+## Mods independentes
+
+Nenhum mod deste repo tem dependência obrigatória de outro mod (deste repo ou de outro). Toda integração é opcional: o mod lê `mods/<nome>/mod.json` na pasta live (`readTextFile(`${appHome()}/mods/<nome>/mod.json`)`) e, sem o outro mod, cai no equivalente do Herdr ou esconde o recurso:
+
+- `spaces-plus`: sem `space-menu` abre o `menu` do Herdr (`{ tab: "space", target: { id } }`); sem `space-pin` o `ensurePinTabs` não cria placeholder. Re-checa a cada 5 s.
+- `space-menu`: sem `space-pin` esconde **Pin space** (mantém **Unpin** para spaces já pinados) e não cria placeholder; sem `worktree-plus` abre o `worktree` do Herdr (mesmas props).
+- `new-menu-plus`: sem `worktree-plus` abre o `worktree` do Herdr.
+- `changes-plus`: sem `git-graph` esconde o botão Git Graph. Re-checa a cada 5 s.
+
+Ícones vêm só da própria pasta do mod ou dos mods shipped (`workspace-chrome`, `pane`); nunca de outro mod custom. Ao adicionar uma integração nova, siga o mesmo padrão.
+
 ## Limite de publicação
 
 A barra de abas e o comportamento de abas (`cmd+t`/New tab, `cmd+1..9`, `cmd+w` e esconder/mostrar o placeholder) pertencem ao repo `herdr-tab-actions` (`tabs-ref`). Aqui ficam o painel de spaces, o pin e a UI do placeholder `space-pin`. O `ensurePinTabs` do `spaces-plus` é fallback para spaces em segundo plano e para layouts sem `tabs-ref`.
