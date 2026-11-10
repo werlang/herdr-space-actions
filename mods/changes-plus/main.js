@@ -1,6 +1,6 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar, v_virtual_list } from "gpui-base";
-import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, run, shared } from "herdr";
+import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings, run, shared, appHome } from "herdr";
 
 function location() {
   const space = spaces().find((s) => s.active), f = focused();
@@ -19,6 +19,12 @@ const key = () => JSON.stringify(location());
 // Reads write nothing under .git (no index refresh or lock, no fsmonitor cookie):
 // the folder watch would see it, and every refresh would start the next one.
 const READ = ["--no-optional-locks", "-c", "core.fsmonitor=false", "-c", "diff.autoRefreshIndex=false"];
+/**
+ * Whether the optional git-graph mod is installed (its manifest exists in the
+ * live mods folder). The Git Graph button only shows while it is.
+ * @returns {Promise<boolean>}
+ */
+const hasGitGraph = () => readTextFile(`${appHome()}/mods/git-graph/mod.json`).then((text) => typeof text === "string").catch(() => false);
 const countLines = (text) => text ? text.split("\n").length - Number(text.endsWith("\n")) : 0;
 
 // Numbers each diff line once, so a frame only draws the rows on screen.
@@ -50,6 +56,13 @@ export default class Changes extends View {
     this.input.on("blur", (_e, cx) => { this.typing = false; cx.notify(); });
     this.refresh(cx);
     cx.timer.every(10000, (cx) => this.refresh(cx));
+    this.gitGraph = false;
+    const probe = (cx) => cx.spawn(async (cx) => {
+      const has = await hasGitGraph();
+      if (has !== this.gitGraph) { this.gitGraph = has; cx.notify(); }
+    });
+    probe(cx);
+    cx.timer.every(5000, probe);
     // Switching spaces does not re-render this panel by itself; check the
     // active space cheaply (in memory, no git) so it follows the sidebar at
     // once instead of waiting for the next full refresh. `render` does the
@@ -218,8 +231,8 @@ export default class Changes extends View {
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Changes"))
         .child(div().px(5).py(1).rounded(4).border_1().border_color(t.border).text_size(10).text_color(t.muted).child(`${this.files.length} files`))
-        .child(div().id("btn-git-graph").size(24).rounded(6).flex().items_center().justify_center().cursor_pointer().hover((s) => s.bg(t.hover)).tooltip("Git Graph").on_click((_e, _cx) => this.openGraph())
-          .child(svg("mods/changes-plus/git-graph.svg").size(14).text_color(t.muted)))
+        .when(this.gitGraph, (el) => el.child(div().id("btn-git-graph").size(24).rounded(6).flex().items_center().justify_center().cursor_pointer().hover((s) => s.bg(t.hover)).tooltip("Git Graph").on_click((_e, _cx) => this.openGraph())
+          .child(svg("mods/changes-plus/git-graph.svg").size(14).text_color(t.muted))))
         .child(div().flex_1()).child(div().text_size(11).text_color(t.ansi2).child(`+${add}`)).child(div().text_size(11).text_color(t.ansi1).child(`−${del}`)))
       .child(v_flex().id("changes-list").flex_none().h(Math.min(200, Math.max(44, this.files.length * 28 + 12))).overflow_y_scrollbar().p(6).border_b(1).border_color(t.border).children(this.files.map((f) => {
         const parts = f.path.split("/"), name = parts.pop();
