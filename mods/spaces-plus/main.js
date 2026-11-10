@@ -7,7 +7,7 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { spaces, machines, panes, run, openOverlay, closeOverlay, props, exec, hc, theme, shared, setShared, watchFolder, window, layout, nextCommand } from "herdr";
+import { spaces, machines, panes, run, openOverlay, closeOverlay, props, exec, hc, theme, shared, setShared, watchFolder, window, layout, nextCommand, appHome, readTextFile } from "herdr";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -24,6 +24,23 @@ function mounted(node, mod) {
   if (node.content === mod || node.mod === mod) return true;
   if (node.content && typeof node.content === "object" && node.content.mod === mod) return true;
   return (node.children ?? []).some((child) => mounted(child, mod));
+}
+
+/**
+ * Optional mods this list works with; none is required.
+ * - space-pin: the placeholder tab that keeps a pinned space alive.
+ * - space-menu: the right-click menu with Pin space and Open in VS Code
+ *   (otherwise Herdr's own `menu`).
+ */
+const OPTIONAL_MODS = ["space-pin", "space-menu"];
+
+/**
+ * Whether a mod is installed in the live mods folder (its manifest exists).
+ * @param {string} name mod folder name
+ * @returns {Promise<boolean>}
+ */
+function installed(name) {
+  return readTextFile(`${appHome()}/mods/${name}/mod.json`).then((text) => typeof text === "string").catch(() => false);
 }
 
 // The sidebar's rail goes by its width, not a flag: dragging its edge narrows it too.
@@ -147,6 +164,10 @@ export default class Spaces extends View {
     this.over = null;
     this.machines = [];
     this.pendingPins = new Set();
+    /** @type {Record<string, boolean>} which OPTIONAL_MODS are installed */
+    this.mods = {};
+    this.probeMods(cx);
+    cx.timer.every(5000, (cx) => this.probeMods(cx));
     this.reconnecting = readJSON("machines.reconnecting", {}, isObject);
     for (const state of Object.values(this.reconnecting)) state.busy = false;
     this.folded = new Set(readJSON("machines.folded", [], Array.isArray));
@@ -190,6 +211,9 @@ export default class Spaces extends View {
    * for background spaces and for layouts without herdr-tab-actions.
    */
   ensurePinTabs(sp = spaces(), ps = panes()) {
+    // Without space-pin a pinned space keeps its folder and order, but has no
+    // placeholder: it closes with its last tab, as in Herdr.
+    if (!this.mods?.["space-pin"]) return;
     const pinnedIds = new Set(shared("spaces.pinned") ?? []);
     const pinnedLocs = shared("spaces.pinned_locations") ?? {};
     const openIds = new Set(sp.map((s) => s.id));
@@ -414,9 +438,25 @@ export default class Spaces extends View {
     });
   }
 
+  /**
+   * Reads which OPTIONAL_MODS are installed and redraws when that changed.
+   * @param {object} cx
+   */
+  probeMods(cx) {
+    cx.spawn(async (cx) => {
+      const found = await Promise.all(OPTIONAL_MODS.map(installed));
+      const next = Object.fromEntries(OPTIONAL_MODS.map((name, i) => [name, found[i]]));
+      if (OPTIONAL_MODS.some((name) => next[name] !== this.mods[name])) {
+        this.mods = next;
+        cx.notify();
+      }
+    });
+  }
+
   menu(w) {
     // A popup is as tall as its items; height is only the most.
-    openOverlay({ mod: "space-menu", kind: "popup", width: 240, height: 320, props: { space: w.id } });
+    if (this.mods["space-menu"]) openOverlay({ mod: "space-menu", kind: "popup", width: 240, height: 320, props: { space: w.id } });
+    else openOverlay({ mod: "menu", kind: "popup", width: 200, height: 260, props: { tab: "space", target: { id: w.id } } });
   }
 
   sortMenu(t) {
