@@ -1,10 +1,12 @@
-// Agents in grouped or priority views; parents take their most urgent sub-agent's place.
-// A viewed done agent stays in Done until left. Choosing an agent also selects
-// its space, so the Spaces list and the project panels follow it.
+// Agents and plain terminals in grouped or priority views; parents take their
+// most urgent sub-agent's place. A viewed done row stays in Done until left.
+// Choosing a row also selects its space, so the Spaces list and the project
+// panels follow it.
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout, hc } from "herdr";
+import { termFacts, termStatus } from "./term-status.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -69,8 +71,19 @@ const SORTS = [
   { id: "grouped", label: "Grouped by space", icon: "layers" },
 ];
 const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[0];
+// What the panel lists: agents only, plain terminals only, or both.
+const SHOWS = [
+  { id: "all", label: "All", icon: "layers" },
+  { id: "agents", label: "Agents", icon: "sidebar" },
+  { id: "terminals", label: "Terminals", icon: "terminal" },
+];
+const showOf = () => SHOWS.find((s) => s.id === shared("agents.show")) ?? SHOWS[0];
 const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
 const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
+
+// The first words of what runs in a terminal, for its row: "npm run dev".
+const commandOf = (argv) => (argv ?? []).slice(0, 3).map((a) => a.split("/").pop() || a).join(" ");
+const carriesFacts = (t) => Boolean(t) && Object.prototype.hasOwnProperty.call(t, "foreground") && (Object.prototype.hasOwnProperty.call(t, "exit_code") || Object.prototype.hasOwnProperty.call(t, "exitCode"));
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -106,11 +119,20 @@ export default class Agents extends View {
   init(_props, cx) {
     if (props()?.sortMenu) return;
     this.folded = new Set();
+    this.idleOpen = new Set();
     // Each agent's last state and when it changed (ms), kept across restarts.
     this.changed = readJSON("changed", {}, isObject);
     this.pendingPins = readJSON("pins", [], Array.isArray);
     if (!this.pendingPins.length) localStorage.removeItem("pins");
     this.migratingPins = new Set();
+    // Plain terminals: the last `hc get` facts (terminals() may not carry the
+    // foreground), each one's last state, and the one held in Done while viewed.
+    this.termFacts = new Map();
+    this.termSeen = new Map();
+    this.termHeld = null;
+    this.polling = false;
+    this.pollTerms(cx);
+    cx.timer.every(3000, (cx) => this.pollTerms(cx));
     cx.timer.every(30000, (cx) => cx.notify());
   }
 
@@ -151,8 +173,179 @@ export default class Agents extends View {
     else localStorage.removeItem("pins");
   }
 
+  // Plain terminals with a pane: not mod panes, not agent programs, no status.
+  termPanes() {
+    return panes().filter((p) => p.terminal && p.status == null && !p.program?.agent);
+  }
+
+  // The foreground and exit details terminals() may not carry, asked of hc
+  // off render. Failures keep the last value; notify only when one changed.
+  pollTerms(cx) {
+    if (this.polling) return;
+    const wanted = this.termPanes().map((p) => p.terminal);
+    for (const addr of [...this.termFacts.keys()]) if (!wanted.includes(addr)) this.termFacts.delete(addr);
+    const live = new Map(terminals().map((t) => [t.address, t]));
+    const missing = wanted.filter((addr) => !carriesFacts(live.get(addr)));
+    if (!missing.length) return;
+    this.polling = true;
+    cx.spawn(async (cx) => {
+      try {
+        const results = await Promise.all(missing.map(async (addr) => {
+          try {
+            const r = await hc(["get", addr, "--json"]);
+            return r.code === 0 ? [addr, JSON.parse(r.stdout)] : null;
+          } catch {
+            return null;
+          }
+        }));
+        let dirty = false;
+        for (const result of results) {
+          if (!result) continue;
+          const [addr, data] = result;
+          const facts = termFacts(data, null, null);
+          if (!facts) continue;
+          const key = JSON.stringify(facts);
+          if (this.termFacts.get(addr)?.key === key) continue;
+          this.termFacts.set(addr, { ...facts, key });
+          dirty = true;
+        }
+        if (dirty) cx.notify();
+      } finally {
+        this.polling = false;
+      }
+    });
+  }
+
+  // A row per plain terminal, with the state termStatus() gives it and the
+  // command it last ran in front of its shell.
+  termRows(all, now) {
+    const byAddress = new Map(all.map((t) => [t.address, t]));
+    const spots = new Map(spaces().flatMap((s) => s.tabs.map((tab) => [tab.id, { space: s, tab }])));
+    const rows = [];
+    for (const p of this.termPanes()) {
+      const spot = spots.get(p.tab);
+      // A brand-new terminal the core hasn't listed yet still gets its row.
+      const raw = byAddress.get(p.terminal) ?? { state: "live", program: p.program, title: p.title };
+      const facts = termFacts(raw, this.termFacts.get(p.terminal), p.program?.name);
+      if (!facts) continue;
+      const prev = this.termSeen.get(p.terminal) ?? null;
+      const focusedNow = Boolean(p.focused || focused()?.terminal === p.terminal);
+      const status = termStatus(facts, prev?.s ?? null, focusedNow);
+      if (!status) continue;
+      const command = facts.working ? commandOf(facts.argv) : prev?.cmd ?? null;
+      // Done turning idle on a look keeps the moment it finished.
+      const kept = prev && (prev.s === status || (status === "idle" && (prev.s === "done" || prev.s === "working")));
+      this.termSeen.set(p.terminal, { s: status, at: kept ? prev.at : now, cmd: command || prev?.cmd || null });
+      rows.push({
+        term: true,
+        address: p.terminal,
+        pane: p.pane,
+        space: spot?.space.id ?? null,
+        space_name: spot?.space.name ?? "",
+        tab_name: spot?.tab.name ?? "",
+        tab_named: Boolean(spot?.tab.named),
+        program: p.program,
+        status,
+        focused: focusedNow,
+        command: command || prev?.cmd || null,
+        wasDone: prev?.s === "done",
+        seq: 0,
+        pinned: false,
+      });
+    }
+    // A closed terminal's state is no use to the next one at that address.
+    for (const addr of [...this.termSeen.keys()]) if (!rows.some((r) => r.address === addr)) this.termSeen.delete(addr);
+    return rows;
+  }
+
+  // A done terminal keeps its place in Done while its pane has the keyboard.
+  holdTerm(rows) {
+    const cur = rows.find((r) => r.focused);
+    if (cur?.wasDone) this.termHeld = cur.address;
+    const held = rows.find((r) => r.address === this.termHeld);
+    if (!held || !held.focused || held.status !== "idle") this.termHeld = null;
+  }
+
+  termRank(a) {
+    return a.focused && a.status === "idle" && this.termHeld === a.address ? RANK.done : RANK[a.status] ?? 0;
+  }
+
+  // Select the terminal's space first, so the Spaces list and its panels follow.
+  showTerm(a) {
+    if (a.space) run("space.select", { id: a.space });
+    run("pane.focus", { pane: a.pane });
+  }
+
+  // The folded idle shells of one group: a count that opens and closes them.
+  idleRow(t, id, n) {
+    const open = this.idleOpen.has(id);
+    return h_flex()
+      .id(`idle-${id}`)
+      .px(8)
+      .h(24)
+      .flex_none()
+      .gap(5)
+      .items_center()
+      .rounded(6)
+      .cursor_pointer()
+      .text_size(11)
+      .text_color(t.dim)
+      .hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .on_click((_e, cx) => {
+        open ? this.idleOpen.delete(id) : this.idleOpen.add(id);
+        cx.notify();
+      })
+      .child(svg(`mods/workspace-chrome/chevron-${open ? "down" : "right"}.svg`).size(11).flex_none())
+      .child(div().child(n === 1 ? "1 idle shell" : `${n} idle shells`));
+  }
+
+  // The collapsed rail's copy: a number and the state, like an agent's.
+  termRail(t, r, i) {
+    return h_flex()
+      .id(`term-${r.address}`)
+      .h(26)
+      .px(8)
+      .flex_none()
+      .items_center()
+      .gap(4)
+      .hover((s) => s.bg(t.hover))
+      .on_click(() => this.showTerm(r))
+      .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(t.muted).child(String(i + 1)))
+      .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, r, true)));
+  }
+
+  // A plain terminal row: the running command while it works or finishes, the
+  // tab or shell at its prompt, its space where another row doesn't say it.
+  termRow(t, r, compact, now, full) {
+    const idle = r.status === "idle";
+    const label = idle ? (r.tab_named ? r.tab_name : r.program?.name || "shell") : r.command || r.program?.name || "shell";
+    const detail = full ? null : (r.tab_named && r.tab_name !== label ? r.tab_name : null);
+    const name = full ? r.space_name || label : label;
+    const sub = full ? (r.space_name ? label : null) : detail;
+    const pic = icon(r.program, 16, t.foreground) ?? svg("mods/workspace-chrome/terminal.svg").size(14).flex_none().text_color(t.muted);
+    const when = this.since(r);
+    return h_flex()
+      .id(`term-${r.address}`)
+      .px(8)
+      .h(30)
+      .flex_none()
+      .rounded(8)
+      .items_center()
+      .gap(9)
+      .when(r.focused, (el) => el.bg(t.selected))
+      .cursor_pointer()
+      .hover((s) => s.bg(t.hover))
+      .on_click(() => this.showTerm(r))
+      .child(pic)
+      .child(h_flex().flex_1().min_w(0).gap(5).items_center()
+        .child(div().min_w(0).max_w(full && sub ? 120 : 200).truncate().text_color(idle ? t.muted : t.foreground).child(name))
+        .when(Boolean(sub), el => el.child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(`\u00b7 ${sub}`))))
+      .when(Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
+      .child(this.status(t, r, compact));
+  }
+
   since(a) {
-    return this.changed[a.address]?.at ?? 0;
+    return (a.term ? this.termSeen.get(a.address) : this.changed[a.address])?.at ?? 0;
   }
 
   // Looking at a done agent makes it idle; it stays with Done until you leave
@@ -171,12 +364,13 @@ export default class Agents extends View {
 
   sortMenu(t) {
     const on = sortOf().id;
+    const show = showOf().id;
     return v_flex()
       .w_full()
       .p(5)
       .bg(t.popover)
       .text_size(12.8)
-      .child(div().px(8).pt(4).pb(6).text_size(11).text_color(t.dim).child("Sort agents"))
+      .child(div().px(8).pt(4).pb(6).text_size(11).text_color(t.dim).child("Sort"))
       .children(SORTS.map((s) => h_flex()
         .id(`sort-${s.id}`)
         .h(31)
@@ -192,7 +386,24 @@ export default class Agents extends View {
         })
         .child(svg(`mods/workspace-chrome/${s.icon}.svg`).size(14).flex_none().text_color(t.muted))
         .child(div().flex_1().child(s.label))
-        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
+        .when(s.id === on, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))))
+      .child(div().px(8).pt(8).pb(6).text_size(11).text_color(t.dim).child("Show"))
+      .children(SHOWS.map((s) => h_flex()
+        .id(`show-${s.id}`)
+        .h(31)
+        .px(8)
+        .gap(9)
+        .rounded(7)
+        .items_center()
+        .text_color(t.foreground)
+        .hover((el) => el.bg(t.hover))
+        .on_click(() => {
+          setShared("agents.show", s.id);
+          closeOverlay(props().overlay);
+        })
+        .child(svg(`mods/workspace-chrome/${s.icon}.svg`).size(14).flex_none().text_color(t.muted))
+        .child(div().flex_1().child(s.label))
+        .when(s.id === show, (el) => el.child(svg("mods/workspace-chrome/check.svg").size(14).flex_none().text_color(t.foreground)))));
   }
 
   // Show an agent where it lives: its space first, so the Spaces list and the
@@ -264,24 +475,64 @@ export default class Agents extends View {
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
     const sort = sortOf();
-    let list = agents();
-    this.listed = new Map(list.map((a) => [a.address, a.status]));
+    const show = showOf();
+    const showAgents = show.id !== "terminals";
+    const showTerms = show.id !== "agents";
+    const listed = showAgents ? agents() : [];
+    this.listed = new Map(listed.map((a) => [a.address, a.status]));
     const all = terminals();
     this.migratePins(all);
     const shown = focused()?.agent;
     const now = Date.now();
-    this.track(list, now);
-    this.hold(list);
+    this.track(listed, now);
+    this.hold(listed);
+    const terms = showTerms ? this.termRows(all, now) : [];
+    this.holdTerm(terms);
     const byPriority = sort.id === "priority";
-    const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
-    const rankOf = (a) => urgency.get(a.address);
-    if (byPriority) list = [...list].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || y.seq - x.seq);
-    const pinned = list.filter((a) => a.pinned);
-    const rest = list.filter((a) => !a.pinned);
-    list = [...pinned, ...rest];
-    setAgentOrder(list.map((a) => a.address));
+    const urgency = new Map(listed.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
+    const rankOf = (a) => (a.term ? this.termRank(a) : urgency.get(a.address));
+    const pinned = listed.filter((a) => a.pinned);
+    const restAgents = listed.filter((a) => !a.pinned);
+
+    // Groups in list order: spaces (grouped) or priority sections. Pinned
+    // agents stay on top; plain terminals join their space or section.
+    let ordered;
+    let groups;
+    if (byPriority) {
+      const rest = [...restAgents, ...terms].sort((x, y) => rankOf(y) - rankOf(x) || this.since(y) - this.since(x) || (y.seq ?? 0) - (x.seq ?? 0) || String(x.address).localeCompare(String(y.address)));
+      ordered = [...pinned, ...rest];
+      groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
+      for (const a of rest) {
+        const r = rankOf(a) || RANK.idle;
+        const id = `sec-${r}`;
+        if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
+        else groups.push({ id, label: SECTION[r], status: SECTION_STATUS[r], members: [a] });
+      }
+    } else {
+      groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
+      const bySpace = new Map();
+      for (const a of restAgents) {
+        const id = `sp-${a.space}`;
+        let g = bySpace.get(id);
+        if (!g) { g = { id, label: a.space_name || "", status: null, space: a.space, members: [] }; bySpace.set(id, g); groups.push(g); }
+        g.members.push(a);
+      }
+      for (const r of terms) {
+        const id = `sp-${r.space}`;
+        let g = bySpace.get(id);
+        if (!g) { g = { id, label: r.space_name || "", status: null, space: r.space, members: [] }; bySpace.set(id, g); groups.push(g); }
+        g.members.push(r);
+      }
+      const order = new Map(spaces().map((s, i) => [s.id, i]));
+      const head = groups[0]?.id === "pinned" ? groups.shift() : null;
+      groups.sort((x, y) => (order.get(x.space) ?? Infinity) - (order.get(y.space) ?? Infinity));
+      if (head) groups.unshift(head);
+      ordered = groups.flatMap((g) => g.members);
+    }
+    setAgentOrder(ordered.filter((a) => !a.term).map((a) => a.address));
 
     const withKids = (a, i) => {
+      if (a.term) return [collapsed ? this.termRail(t, a, i) : this.termRow(t, a, byPriority, now, byPriority)];
       const subs = collapsed ? [] : this.tree(all, a.address);
       const r = row(a, i, subs);
       if (this.folded.has(a.address)) return [r];
@@ -322,10 +573,10 @@ export default class Agents extends View {
       const tab = tabs.find(tab => tab.id === a.tab);
       return tab ? title(tab, lead(tab)) : a.title || a.program?.name || "";
     };
-    const detail = new Map(list.map(a => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
+    const detail = new Map(listed.map(a => [a.address, /^\d+$/.test(label(a)) ? null : label(a)]));
     const seen = {};
-    for (const a of list) { const k = `${a.space_name}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
-    for (const a of list) {
+    for (const a of listed) { const k = `${a.space_name}\u0000${detail.get(a.address) ?? ""}`; seen[k] = (seen[k] ?? 0) + 1; }
+    for (const a of listed) {
       if (detail.get(a.address) == null && seen[`${a.space_name}\u0000`] > 1) detail.set(a.address, label(a));
     }
 
@@ -404,16 +655,6 @@ export default class Agents extends View {
         .child(this.status(t, a, byPriority && !isPinned));
     };
 
-    // Groups in list order: spaces (grouped) or priority sections. Agents of a
-    // space are next to each other in agents(), so neighbours make a group.
-    const groups = pinned.length ? [{ id: "pinned", label: "Pinned", status: null, members: pinned }] : [];
-    for (const a of rest) {
-      const r = rankOf(a) || RANK.idle;
-      const id = byPriority ? `sec-${r}` : `sp-${a.space}`;
-      if (groups.at(-1)?.id === id) groups.at(-1).members.push(a);
-      else groups.push({ id, label: byPriority ? SECTION[r] : a.space_name || "", status: byPriority ? SECTION_STATUS[r] : null, members: [a] });
-    }
-
     // A group's header; it folds the group. Folded, it says how many and the most urgent state.
     const header = (g) => {
       const open = !this.folded.has(g.id);
@@ -441,9 +682,28 @@ export default class Agents extends View {
           .when(!byPriority && top && top !== "idle", (el) => el.child(this.status(t, { status: top }, true)))
           .child(svg("mods/workspace-chrome/chevron-right.svg").size(11).flex_none().text_color(t.dim)));
     };
+    // Idle shells fold into one row per group; the rail leaves them out.
+    const idleTerm = (a) => a.term && a.status === "idle" && rankOf(a) === RANK.idle;
+    const members = (g) => {
+      const idle = g.members.filter(idleTerm);
+      const busy = g.members.filter((a) => !idleTerm(a));
+      const open = this.idleOpen.has(g.id);
+      const out = busy.flatMap((a) => withKids(a, 0));
+      if (idle.length) {
+        out.push(this.idleRow(t, g.id, idle.length));
+        if (open) out.push(...idle.flatMap((a) => withKids(a, 0)));
+      }
+      return out;
+    };
+    const rail = ordered.filter((a) => !idleTerm(a));
     const rows = collapsed
-      ? list.flatMap(withKids)
-      : groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : g.members.flatMap(withKids))]);
+      ? rail.flatMap((a, i) => withKids(a, i))
+      : groups.flatMap((g) => [header(g), ...(this.folded.has(g.id) ? [] : members(g))]);
+    const emptyText = !showAgents
+      ? "No running terminals."
+      : !showTerms
+        ? "No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not."
+        : "No agents or terminals yet. Agents show up here when they report their status; plain terminals in panes show here too.";
 
     return v_flex()
       .size_full()
@@ -469,14 +729,14 @@ export default class Agents extends View {
                 .text_size(11)
                 .text_color(t.dim)
                 .hover((s) => s.text_color(t.foreground))
-                .on_click(() => openOverlay({ mod: "agents-plus", kind: "popup", width: 200, height: 140, props: { sortMenu: true } }))
-                .tooltip(`Sort agents: ${sort.label}`)
+                .on_click(() => openOverlay({ mod: "agents-plus", kind: "popup", width: 200, height: 240, props: { sortMenu: true } }))
+                .tooltip(`Sort: ${sort.label} \u00b7 Show: ${show.label}`)
                 .child(svg(`mods/workspace-chrome/${sort.icon}.svg`).size(14)),
             ),
         ),
       )
-      .when(list.length === 0 && !collapsed, (el) =>
-        el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
+      .when(listed.length === 0 && terms.length === 0 && !collapsed, (el) =>
+        el.child(div().px(12).text_size(12).text_color(t.dim).child(emptyText)),
       )
       .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always").children(rows))
       .when(collapsed, (el) =>
