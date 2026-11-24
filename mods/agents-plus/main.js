@@ -198,9 +198,16 @@ export default class Agents extends View {
 
   // Show an agent where it lives: its space first, so the Spaces list and the
   // project panels follow even when its pane is in a space that isn't shown.
+  // If the agent's tab is currently in zoomed Chat mode, focus the chat pane
+  // so clicking the agent again does not unzoom it back to Original mode.
   show(agent) {
     run("space.select", { id: agent.space });
-    run("pane.focus", { pane: agent.pane });
+    const all = panes();
+    const agentPane = all.find((p) => p.pane === agent.pane);
+    const zoomedChat = agentPane
+      ? all.find((p) => p.tab === agentPane.tab && p.mod === "agent-chat" && p.zoomed)
+      : null;
+    run("pane.focus", { pane: zoomedChat ? zoomedChat.pane : agent.pane });
   }
 
   peek(addr) {
