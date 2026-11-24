@@ -280,7 +280,8 @@ export default class Agents extends View {
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
     const sort = sortOf();
-    let list = agents();
+    const pendingClose = new Set(shared("tabs.pending_close") ?? []);
+    let list = pendingClose.size ? agents().filter((a) => !pendingClose.has(a.tab)) : agents();
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
     this.migratePins(all);
