@@ -64,7 +64,7 @@ Herdr's built-in `tab.new` starts a terminal in the space's creation folder. Pin
 
 ## Agents and Changes panes
 
-- **`agents-plus`** is a clone of the shipped **Agents** panel. Clicking an agent row selects that agent's space before showing its pane, so the Spaces list highlight and the Changes/Files panels follow the agent. Sub-agent rows select the parent agent's space before peeking at the sub-agent terminal.
+- **`agents-plus`** is a clone of the shipped **Agents** panel. Clicking an agent row selects that agent's space before showing its pane, so the Spaces list highlight and the Changes/Files panels follow the agent. Sub-agent rows select the parent agent's space before peeking at the sub-agent terminal. A chat view split beside the agent's terminal (`agent-chat`, `tabs-ref`'s **Original / Chat** toggle) keeps that agent selected while the chat pane has the keyboard.
 - **`changes-plus`** is a clone of the shipped **Changes** panel that reads the pinned folder: in a pinned space it shows that project's changes and its Git Graph button opens the graph on the same project, no matter where the focused terminal has `cd`'d.
 
 ## Open in VS Code

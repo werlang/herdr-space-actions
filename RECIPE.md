@@ -31,7 +31,7 @@ Each space in a Git repo shows a secondary line with the branch name and push/pu
 - Opening a new terminal or agent via the UI `+` button (`new-menu-plus`) opens directly in the space's folder (or fixed pinned location), rather than the current directory of the focused terminal.
 - `spaces-plus.newTerminal`, optionally bound to `cmd+t` when `herdr-tab-actions` is not mounted, starts a terminal tab in the pinned location; unpinned spaces keep Herdr's default.
 - With `herdr-tab-actions` mounted, `cmd+t` should point at `tabs-ref.newTab` instead: it opens or selects the **New tab** placeholder, and the tab bar owns hiding/showing it.
-- Clicking an agent in the **Agents** panel (`agents-plus`) selects that agent's space before showing its pane, so the Spaces list and the Changes/Files panels follow the agent. Sub-agent rows select the parent's space before peeking.
+- Clicking an agent in the **Agents** panel (`agents-plus`) selects that agent's space before showing its pane, so the Spaces list and the Changes/Files panels follow the agent. Sub-agent rows select the parent's space before peeking. A chat view beside the agent's terminal keeps that agent selected while the chat pane has the keyboard.
 - The placeholder tab shows the new-tab icon, the space name, the folder, and a menu with **Terminal** and installed agents (`T`/Enter, `1`–`9`).
 - Unpinning closes the placeholder tab and unlocks its location to follow terminal `cd` again. If it was the only tab, the space closes normally.
 - **Close** still closes the space explicitly; the pin protects against an empty space, not against Close.

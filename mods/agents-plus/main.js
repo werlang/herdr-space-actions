@@ -5,6 +5,7 @@
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { selectedAgent } from "./selection.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -157,8 +158,8 @@ export default class Agents extends View {
 
   // Looking at a done agent makes it idle; it stays with Done until you leave
   // it rather than drop away under you. Any other change moves it at once.
-  hold(list) {
-    const cur = list.find((a) => a.focused);
+  hold(list, shown) {
+    const cur = shown ? list.find((a) => a.address === shown) : null;
     const same = cur && cur.address === this.held?.address;
     // Arriving, or any change but done turning idle, sets what it was.
     if (!same || cur.status !== "idle") this.held = cur ? { address: cur.address, rank: RANK[cur.status] ?? 0 } : null;
@@ -268,10 +269,11 @@ export default class Agents extends View {
     this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
     this.migratePins(all);
-    const shown = focused()?.agent;
+    // The chat view (a mod pane) keeps its tab's agent selected (see selection.js).
+    const shown = selectedAgent({ focused: focused(), panes: panes(), agents: list });
     const now = Date.now();
     this.track(list, now);
-    this.hold(list);
+    this.hold(list, shown);
     const byPriority = sort.id === "priority";
     const urgency = new Map(list.map((a) => [a.address, Math.max(this.rank(a), ...this.tree(all, a.address).map((s) => RANK[kidStatus(s.t, this.listed)] ?? 0))]));
     const rankOf = (a) => urgency.get(a.address);
@@ -348,7 +350,8 @@ export default class Agents extends View {
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true)));
       }
       const when = this.since(a);
-      const idle = a.status === "idle" && !a.focused;
+      const on = a.address === shown;
+      const idle = a.status === "idle" && !on;
       const isPinned = a.pinned;
       const pin = div()
         .id(`pin-${a.address}`)
@@ -379,7 +382,7 @@ export default class Agents extends View {
         .rounded(8)
         .items_center()
         .gap(9)
-        .when(a.focused, (el) => el.bg(t.selected))
+        .when(on, (el) => el.bg(t.selected))
         .cursor_pointer()
         .hover((s) => s.bg(t.hover))
         .on_hover((on, cx) => {
