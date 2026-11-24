@@ -207,7 +207,15 @@ export default class Agents extends View {
     const zoomedChat = agentPane
       ? all.find((p) => p.tab === agentPane.tab && p.mod === "agent-chat" && p.zoomed)
       : null;
-    run("pane.focus", { pane: zoomedChat ? zoomedChat.pane : agent.pane });
+    if (zoomedChat) {
+      if (agent.status === "done") {
+        run("pane.focus", { pane: agent.pane });
+        run("pane.zoom", { pane: zoomedChat.pane });
+      }
+      run("pane.focus", { pane: zoomedChat.pane });
+    } else {
+      run("pane.focus", { pane: agent.pane });
+    }
   }
 
   peek(addr) {
