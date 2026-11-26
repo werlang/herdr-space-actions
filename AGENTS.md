@@ -1,82 +1,82 @@
 # herdr-space-actions
 
-Fonte da verdade do plugin de ações de **space** do Herdr:
+Source of truth for the Herdr **space** actions plugin:
 
-- `mods/spaces-plus` — clone do `spaces` que abre o `space-menu` no right-click, mostra o ícone de pin, mostra sob cada space o branch, a cor de merge/commits não enviados/mudanças locais no nome do space e as setas de commits para push/pull, e ordena a lista pelo botão do cabeçalho (alfabética, prioridade, mudanças não commitadas, commits não enviados ou última atividade).
-- `mods/changes-plus` — clone do painel `changes` que lê o local fixado do space pinado: mostra as mudanças do projeto pinado e o botão Git Graph abre o graph no mesmo projeto, mesmo que um terminal tenha feito `cd` para outro repositório. Acompanha a troca de space na hora, mesmo quando o novo space não tem terminal com foco.
-- `mods/agents-plus` — clone do painel `agents`: lista agents e terminais comuns nas mesmas seções (Needs you, Done, Working, Idle) ou agrupados por space, com filtro All/Agents/Terminals; um terminal mostra o comando em execução e os shells ociosos dobram numa linha "N idle shells". Clicar numa linha (inclusive sub-agent) seleciona o space antes de mostrar o pane, então o projeto na lista de spaces e os painéis de Changes/Files acompanham. O Chat View (pane de mod no mesmo tab) mantém o agent do terminal selecionado: `focused().agent` não vale para panes de mod, então `selection.js` resolve o agent do terminal do tab.
-- `mods/space-menu` — menu com **Pin space / Unpin space**, **Open in VS Code**, **Open in Finder/Explorer** (conforme o sistema), Rename, worktree e Close.
-- `mods/space-pin` — a aba placeholder **New tab** que mantém um space pinado vivo quando todos os terminais/agents fecham e oferece atalhos de terminal/agent para o space.
-- `mods/new-menu-plus` — menu do botão `+` que abre terminais e agents no local do space (ou local fixado do pin) em vez do `cwd` do terminal com foco.
-- `mods/worktree-plus` — clone do diálogo `worktree` com o visual dos modais do plugin (New, Open e Remove worktree); abre no local do space.
+- `mods/spaces-plus` — clone of `spaces` that opens `space-menu` on right-click, shows the pin icon, shows under each space the branch, merge/unpushed/dirty color on the space name, and push/pull commit arrows, and sorts the list via the header button (alphabetical, priority, uncommitted changes, unpushed commits, or last activity).
+- `mods/changes-plus` — clone of the `changes` panel that reads the pinned space's fixed location: shows changes for the pinned project and the Git Graph button opens the graph in the same project, even if a terminal ran `cd` into another repository. Follows space switches immediately, even when the new space has no focused terminal.
+- `mods/agents-plus` — clone of the `agents` panel: lists agents and regular terminals in the same sections (Needs you, Done, Working, Idle) or grouped by space, with an All/Agents/Terminals filter; a terminal shows its running command and idle shells fold into an "N idle shells" row. Clicking a row (including a sub-agent) selects the space before showing the pane, so the project in the spaces list and the Changes/Files panels follow along. Chat View (a mod pane in the same tab) keeps the selected terminal's agent: `focused().agent` does not apply to mod panes, so `selection.js` resolves the tab's terminal agent.
+- `mods/space-menu` — menu with **Pin space / Unpin space**, **Open in VS Code**, **Open in Finder/Explorer** (per OS), Rename, worktree, and Close.
+- `mods/space-pin` — the **New tab** placeholder tab that keeps a pinned space alive when all terminals/agents close and offers terminal/agent shortcuts for the space.
+- `mods/new-menu-plus` — `+` button menu that opens terminals and agents in the space's location (or pinned location) instead of the focused terminal's `cwd`.
+- `mods/worktree-plus` — clone of the `worktree` dialog styled to match the plugin's modals (New, Open, and Remove worktree); opens in the space's location.
 
-## Comando `newTerminal`
+## `newTerminal` command
 
-O `spaces-plus` atende `spaces-plus.newTerminal` via `nextCommand()`: abre uma aba de terminal no local fixado do space pinado (ou no `cwd` do terminal com foco, se o space não for pinado). Serve para ligar o `cmd+t` a ele quando o Herdr passaria a usar a pasta de criação do space, em layouts sem `herdr-tab-actions`:
+`spaces-plus` handles `spaces-plus.newTerminal` via `nextCommand()`: it opens a terminal tab in the pinned space's fixed location (or in the focused terminal's `cwd` if the space is not pinned). Bind `cmd+t` to it when Herdr would otherwise use the space's creation folder, in layouts without `herdr-tab-actions`:
 
 ```json
 "cmd-t": "spaces-plus.newTerminal"
 ```
 
-Só funciona enquanto o `spaces-plus` estiver montado no layout atual; em layouts sem ele, mantenha `tab.new`.
+Only works while `spaces-plus` is mounted in the current layout; in layouts without it, keep `tab.new`.
 
-### New tab e foco
+### New tab and focus
 
-Com `herdr-tab-actions` montado, `cmd+t` deve apontar para `tabs-ref.newTab`: ele abre ou seleciona a aba `New tab` do `space-pin`. O `spaces-plus.newTerminal` continua sendo o atalho para abrir um terminal no local fixado. Sem `tabs-ref`, use `spaces-plus.newTerminal` (ou `tab.new`).
+With `herdr-tab-actions` mounted, `cmd+t` should point to `tabs-ref.newTab`: it opens or selects the `space-pin` `New tab` tab. `spaces-plus.newTerminal` remains the shortcut to open a terminal in the pinned location. Without `tabs-ref`, use `spaces-plus.newTerminal` (or `tab.new`).
 
-Depois de criar ou selecionar o placeholder, a cópia visível do `space-pin` recebe o foco pelo timer de 50 ms; `T`/Enter abrem um terminal e `1`–`9` abrem o agent. O `focus()` nunca é chamado no `render()`, e cada cópia só age quando `props().space` é o space ativo.
+After creating or selecting the placeholder, the visible `space-pin` instance receives focus via the 50 ms timer; `T`/Enter opens a terminal and `1`–`9` opens the agent. `focus()` is never called in `render()`, and each instance only acts when `props().space` is the active space.
 
-## Mods independentes
+## Independent mods
 
-Nenhum mod deste repo tem dependência obrigatória de outro mod (deste repo ou de outro). Toda integração é opcional: o mod lê `mods/<nome>/mod.json` na pasta live (`readTextFile(`${appHome()}/mods/<nome>/mod.json`)`) e, sem o outro mod, cai no equivalente do Herdr ou esconde o recurso:
+No mod in this repo has a required dependency on any other mod (in this repo or another). Every integration is optional: the mod checks `mods/<name>/mod.json` in the live folder (`readTextFile(`${appHome()}/mods/<name>/mod.json`)`) and, if the other mod is absent, falls back to Herdr's built-in equivalent or hides the feature:
 
-- `spaces-plus`: sem `space-menu` abre o `menu` do Herdr (`{ tab: "space", target: { id } }`); sem `space-pin` o `ensurePinTabs` não cria placeholder. Re-checa a cada 5 s.
-- `space-menu`: sem `space-pin` esconde **Pin space** (mantém **Unpin** para spaces já pinados) e não cria placeholder; sem `worktree-plus` abre o `worktree` do Herdr (mesmas props).
-- `new-menu-plus`: sem `worktree-plus` abre o `worktree` do Herdr.
-- `changes-plus`: sem `git-graph` esconde o botão Git Graph. Re-checa a cada 5 s.
+- `spaces-plus`: without `space-menu`, opens Herdr's `menu` (`{ tab: "space", target: { id } }`); without `space-pin`, `ensurePinTabs` does not create a placeholder. Re-checks every 5 s.
+- `space-menu`: without `space-pin`, hides **Pin space** (keeps **Unpin** for already-pinned spaces) and does not create a placeholder; without `worktree-plus`, opens Herdr's `worktree` (same props).
+- `new-menu-plus`: without `worktree-plus`, opens Herdr's `worktree`.
+- `changes-plus`: without `git-graph`, hides the Git Graph button. Re-checks every 5 s.
 
-Ícones vêm só da própria pasta do mod ou dos mods shipped (`workspace-chrome`, `pane`); nunca de outro mod custom. Ao adicionar uma integração nova, siga o mesmo padrão.
+Icons come only from the mod's own folder or from shipped mods (`workspace-chrome`, `pane`); never from another custom mod. Follow the same pattern when adding a new integration.
 
-## Limite de publicação
+## Publishing boundary
 
-A barra de abas e o comportamento de abas (`cmd+t`/New tab, `cmd+1..9`, `cmd+w` e esconder/mostrar o placeholder) pertencem ao repo `herdr-tab-actions` (`tabs-ref`). Aqui ficam o painel de spaces, o pin e a UI do placeholder `space-pin`. O `ensurePinTabs` do `spaces-plus` é fallback para spaces em segundo plano e para layouts sem `tabs-ref`.
+The tab bar and tab behavior (`cmd+t`/New tab, `cmd+1..9`, `cmd+w`, and hiding/showing the placeholder) belong to the `herdr-tab-actions` repo (`tabs-ref`). This repo owns the spaces panel, pinning, and the `space-pin` placeholder UI. `ensurePinTabs` in `spaces-plus` is a fallback for background spaces and for layouts without `tabs-ref`.
 
-## Ordenação dos spaces
+## Sorting spaces
 
-O cabeçalho do `spaces-plus` tem um botão de ordenação que abre um popup com:
+The `spaces-plus` header has a sort button that opens a popup with:
 
-- **Manual order** — a ordem do próprio Herdr, com arrastar para reordenar;
+- **Manual order** — Herdr's own order, with drag-to-reorder;
 - **Alphabetical**;
-- **Priority** — blocked (requer ação), idle, done, depois working e spaces sem status;
-- **Uncommitted changes** — mais arquivos sujos primeiro;
-- **Unpushed commits** — mais commits para push primeiro;
-- **Last activity** — mudança de estado mais recente primeiro.
+- **Priority** — blocked (needs action), idle, done, then working and spaces without status;
+- **Uncommitted changes** — most dirty files first;
+- **Unpushed commits** — most commits to push first;
+- **Last activity** — most recent state change first.
 
-Abaixo dos modos, o toggle **Keep pinned spaces first** mantém os spaces pinados no topo de qualquer modo de ordenação. Fica em `shared("spaces.pinned_first")` e não afeta a ordem manual, onde o arrastar continua mandando. Uma linha de repositório também conta como pinada quando uma de suas worktrees está pinada.
+Below the modes, the **Keep pinned spaces first** toggle keeps pinned spaces at the top of any sort mode. Stored in `shared("spaces.pinned_first")`, it does not affect manual order where dragging stays in control. A repository row also counts as pinned when one of its worktrees is pinned.
 
-O modo escolhido fica em `shared("spaces.sort")`. A ordenação é só visual: não chama `space.move`, então `cmd+1..9`, `space.next` e `space.prev` continuam na ordem do modelo. Worktrees continuam aninhadas sob o checkout principal; a linha principal usa o agregado das worktrees (prioridade máxima, soma de mudanças/commits, atividade mais recente), então uma worktree urgente sobe junto com o repo. O arrastar para reordenar aparece só no modo manual.
+The chosen mode is stored in `shared("spaces.sort")`. Sorting is visual only: it does not call `space.move`, so `cmd+1..9`, `space.next`, and `space.prev` keep the model order. Worktrees stay nested under the main checkout; the main row aggregates its worktrees (highest priority, sum of changes/commits, most recent activity), so an urgent worktree bubbles up with its repo. Drag-to-reorder appears only in manual mode.
 
-## Regra: sempre atualizar a pasta live do Herdr
+## Rule: always update Herdr's live folder
 
-O Herdr lê os mods de `~/.config/herdr-app/mods/<nome>`. Depois de **qualquer** mudança aqui:
+Herdr loads mods from `~/.config/herdr-app/mods/<name>`. After **any** change here:
 
 ```sh
 ./sync.sh
 ```
 
-O script copia `spaces-plus`, `changes-plus`, `space-menu`, `space-pin`, `new-menu-plus`, `agents-plus` e `worktree-plus` para a pasta live e roda `herdr-app check` neles. Não edite a pasta live diretamente.
+The script copies `spaces-plus`, `changes-plus`, `space-menu`, `space-pin`, `new-menu-plus`, `agents-plus`, and `worktree-plus` to the live folder and runs `herdr-app check` on them. Do not edit the live folder directly.
 
-## Testes
+## Tests
 
-A seleção da lista de agents fica em `mods/agents-plus/selection.js` (lógica pura, sem importar `herdr`):
+Agent list selection lives in `mods/agents-plus/selection.js` (pure logic, no `herdr` imports):
 
 ```sh
 node --test test/
 ```
 
-## Ligação no layout
+## Layout wiring
 
-O layout pessoal aponta os blocos `spaces` e `agents` para os clones:
+The personal layout points the `spaces`, `agents`, and `changes` blocks to the clones:
 
 ```json
 {
@@ -102,14 +102,14 @@ O layout pessoal aponta os blocos `spaces` e `agents` para os clones:
 }
 ```
 
-Os `spaces`, `agents` e `changes` originais do Herdr continuam intocados.
+Herdr's original `spaces`, `agents`, and `changes` remain untouched.
 
 ## Pin
 
-O estado fica em `shared("spaces.pinned")` e `shared("spaces.pinned_locations")`. Ao pinar, o mod congela o local do space naquele momento e cria uma aba `New tab` com o mod `space-pin`; ela é o que sobra quando os terminais/agents fecham. Terminais executando `cd` dentro de um space pinado não alteram seu local nem sua ramificação/status git; apenas spaces não pinados acompanham o `cd` dos terminais. Ao despinar, a aba é fechada e o space volta a seguir o `cd` dos terminais. O item **Close** do menu continua fechando o space explicitamente.
+State is stored in `shared("spaces.pinned")` and `shared("spaces.pinned_locations")`. When pinning, the mod freezes the space's location at that moment and creates a `New tab` tab using the `space-pin` mod; it is what remains when all terminals/agents close. Terminals running `cd` inside a pinned space do not alter its location or git branch/status; only unpinned spaces follow terminal `cd`. When unpinning, the placeholder tab is closed and the space resumes following terminal `cd`. The menu's **Close** item still closes the space explicitly.
 
-> Se você deseja que a aba placeholder seja escondida automaticamente enquanto houver outras abas no space, instale o pacote `herdr-tab-actions` (`tabs-ref`).
+> If you want the placeholder tab to be hidden automatically while other tabs exist in the space, install the `herdr-tab-actions` (`tabs-ref`) package.
 
 ## Skill
 
-A skill `herdr-publish` está em `.agents/skills/herdr-publish/SKILL.md`. Ela cobre validação, sync, `RECIPE.md`/`preview.png` e publicação em `herdr.dev/mods` com o tópico `herdr-mod`.
+The `herdr-publish` skill is in `.agents/skills/herdr-publish/SKILL.md`. It covers validation, sync, `RECIPE.md`/`preview.png`, and publishing to `herdr.dev/mods` with the `herdr-mod` topic.
